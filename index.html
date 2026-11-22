@@ -158,7 +158,7 @@ td.res-W { color: var(--pitch); font-weight: 700; } td.res-L { color: var(--red)
 @media (prefers-reduced-motion: reduce) { .ball { animation-duration: 3s; } }
 .error { background: var(--red-2); border: 1px solid var(--red); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
 .note { background: var(--yellow-2); border-left: 4px solid var(--yellow); padding: 8px 10px; border-radius: 4px; margin-bottom: 8px; font-size: 0.9rem; }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + var(--safe-bottom)); background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 8px; z-index: 50; font-size: 0.92rem; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(130px + var(--safe-bottom)); background: var(--ink); color: #fff; padding: 9px 16px; border-radius: 8px; z-index: 50; font-size: 0.92rem; }
 .empty { text-align: center; padding: 26px 10px; color: var(--ink-2); }
 .toggle { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 .toggle input { flex: none; width: 20px; height: 20px; accent-color: var(--pitch); }
@@ -166,12 +166,41 @@ td.res-W { color: var(--pitch); font-weight: 700; } td.res-L { color: var(--red)
 .league-list input { width: 19px; height: 19px; accent-color: var(--pitch); }
 details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .footer-note { font-size: 0.8rem; color: var(--ink-2); text-align: center; margin: 18px 8px 0; }
+
+/* odds, add buttons, bet builder, live */
+.odds { font-family: var(--display); font-weight: 700; color: var(--ink); }
+.odds.fair { color: var(--ink-2); }
+.addbtn { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--pitch); background: var(--sheet); color: var(--pitch); font-size: 1.15rem; font-weight: 700; line-height: 1; display: inline-grid; place-items: center; padding: 0; }
+.addbtn.on { background: var(--pitch); color: #fff; }
+td .addbtn { width: 28px; height: 28px; font-size: 1rem; vertical-align: middle; margin-left: 4px; }
+.cellp { font-weight: 600; }
+button.pchip { font: inherit; font-size: 0.78rem; color: var(--ink); cursor: pointer; }
+.pchip.sel { outline: 2px solid var(--pitch); background: var(--pitch-2); }
+.slipbar { position: fixed; left: 10px; right: 10px; bottom: calc(64px + var(--safe-bottom)); z-index: 25; display: flex; justify-content: space-between; gap: 10px; background: var(--pitch); color: #fff; border: 0; border-radius: 10px; padding: 12px 14px; font-family: var(--display); font-weight: 700; font-size: 1.05rem; box-shadow: 0 2px 10px rgba(20,33,61,0.25); }
+main { padding-bottom: 70px; }
+.oddsin { width: 110px !important; text-align: center; }
+.tag.live { background: var(--red); color: #fff; }
+.tag.ft { background: var(--paper); color: var(--ink-2); border: 1px solid var(--line); }
+.fx .teams div { display: flex; align-items: center; gap: 6px; }
+.fx .sc { margin-left: auto; font-family: var(--display); font-size: 1.15rem; padding-left: 8px; }
+.fx.is-live { border-color: var(--red); }
+.cardy, .cardr { display: inline-block; width: 10px; height: 14px; border-radius: 2px; vertical-align: -2px; }
+.cardy { background: var(--yellow); } .cardr { background: var(--red); }
+tr.nob td { border-bottom: 1px solid var(--line); padding-top: 0; white-space: normal; }
+table.live-pl td:first-child { white-space: normal; min-width: 120px; }
+
+/* bet tracker */
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 6px; }
+.kpis div { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; }
+.kpis b { font-family: var(--display); font-size: 1.4rem; }
+.betleg { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); }
+.bet.won { border-left: 4px solid var(--pitch); } .bet.lost { border-left: 4px solid var(--red); } .bet.open, .bet.check { border-left: 4px solid var(--yellow); }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-window.TEAMSHEET_VERSION='202611211800';
+window.TEAMSHEET_VERSION='202611222011';
 /* ===== stats.js ===== */
 /* Probability engine: count distributions, joint team-stat model, Dixon-Coles score matrix. */
 (function (root) {
@@ -1020,9 +1049,35 @@ window.TEAMSHEET_VERSION='202611211800';
     return p;
   }
 
+
+  /* Pitch zone from a detailed line-up position (ESPN: LB, CD-R, RM, LW, CF; API-Football grid is not used). */
+  function zoneOf(detail) {
+    const d = String(detail || '').toUpperCase();
+    if (!d || d === 'G' || d === 'GK' || d === 'SUB') return null;
+    const side = /^L|-L$/.test(d) ? 'L' : /^R|-R$/.test(d) ? 'R' : 'C';
+    const depth = /(^|-)(CD|CB|D|B|LB|RB|LWB|RWB|SW)($|-)/.test(d) || /B$/.test(d.replace(/-[LR]$/, '')) ? 1 : /^(F|CF|ST|SS|LW|RW|LF|RF|W)($|-)/.test(d) ? 3 : 2;
+    return { side, depth };
+  }
+  /* Direct opponents: the mirrored flank and the facing line (a left-back faces the right winger). */
+  function directOpponents(zone, opps) {
+    if (!zone) return [];
+    const mirror = { L: 'R', R: 'L', C: 'C' }[zone.side], face = 4 - zone.depth, out = [];
+    for (const o of opps) {
+      const z = o.zone; if (!z) continue;
+      let w = 0;
+      if (z.side === mirror && z.depth === face) w = 1;
+      else if (z.side === mirror && Math.abs(z.depth - face) === 1) w = 0.4;
+      else if (z.side === 'C' && zone.side === 'C' && Math.abs(z.depth - face) <= 1) w = 0.4;
+      if (w) out.push({ o, w });
+    }
+    return out;
+  }
+  // Tested on StatsBomb 2015/16 (76,000 player-match lines): exponent 0.25 helped slightly, larger values hurt.
+  const MATCHUP_BETA = 0.25;
+
   FP.players = {
     PSTATS, LABEL, DEFAULT_PRIORS, DEFAULTS, count, normPos, collectAppearances, positionPriors, mainPos,
-    playerRate, minutesScenarios, availability, playerStatPmf, cardProb,
+    playerRate, minutesScenarios, availability, playerStatPmf, cardProb, zoneOf, directOpponents, MATCHUP_BETA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
@@ -1361,7 +1416,7 @@ window.TEAMSHEET_VERSION='202611211800';
           id: e.player && e.player.id, name: e.player && e.player.name, team: teamId,
           pos: g.position || null, number: g.number != null ? g.number : null,
           min, start: g.substitute === false && min > 0, bench: g.substitute === true,
-          rating: num(g.rating), captain: !!g.captain,
+          rating: num(g.rating), captain: !!g.captain, onPitch: g.onPitch,
           shots: z(shots.total), sot: z(shots.on), goals: z(goals.total), assists: z(goals.assists),
           saves: z(goals.saves), conceded: z(goals.conceded),
           fc: z(fouls.committed), fd: z(fouls.drawn),
@@ -1377,7 +1432,7 @@ window.TEAMSHEET_VERSION='202611211800';
     const out = {};
     for (const l of arr) {
       if (!l.team) continue;
-      const m = (x) => ({ id: x.player.id, name: x.player.name, number: x.player.number, pos: x.player.pos, grid: x.player.grid });
+      const m = (x) => ({ id: x.player.id, name: x.player.name, number: x.player.number, pos: x.player.pos, grid: x.player.grid, detail: x.player.detail || null });
       const xi = (l.startXI || []).filter((x) => x && x.player).map(m);
       if (!xi.length) continue;
       out[l.team.id] = {
@@ -1417,6 +1472,10 @@ window.TEAMSHEET_VERSION='202611211800';
         if (h && a) f.st = { h, a };
       }
       f.players = normPlayers(item.players);
+      f.events = Array.isArray(item.events) ? item.events.filter((e) => e && e.type).map((e) => ({
+        min: e.time ? e.time.elapsed : null, extra: e.time ? e.time.extra : null, team: e.team ? e.team.id : null,
+        player: e.player ? e.player.name : null, playerId: e.player ? e.player.id : null, other: e.assist ? e.assist.name : null,
+        type: e.type, detail: e.detail || '' })) : [];
       f.lineups = normLineups(item.lineups);
       // derive missing team stats from player stats where possible
       if (!f.st && f.players && isFinished(f)) {
@@ -2190,17 +2249,18 @@ window.TEAMSHEET_VERSION='202611211800';
       return 'M';
     };
     const clockMin = (txt) => { if (!txt) return null; const m = String(txt).match(/(\d+)'?(?:\s*\+\s*(\d+))?/); if (!m) return null; return Math.min(90, (+m[1]) + (m[2] ? 0 : 0)); };
-    function minutesOf(p) {
+    function minutesOf(p, endMin) {
+      const END = endMin != null ? endMin : 90;
       const plays = p.plays || [];
       const subMins = plays.filter((x) => x.substitution).map((x) => clockMin(x.clock && x.clock.displayValue)).filter((x) => x != null);
       const redMin = plays.filter((x) => x.redCard).map((x) => clockMin(x.clock && x.clock.displayValue)).filter((x) => x != null)[0];
-      let on = null, off = 90;
+      let on = null, off = END;
       if (p.starter) on = 0;
       else if (p.subbedIn) on = subMins.length ? subMins[0] : 75;
       if (on == null) return 0;
       if (p.subbedOut) { const outs = p.starter ? subMins : subMins.slice(1); if (outs.length) off = outs[0]; }
       if (redMin != null) off = Math.min(off, redMin);
-      return Math.max(1, Math.min(90, off) - on);
+      return Math.max(1, Math.min(END, off) - on);
     }
     const statVal = (stats, name) => { const s = (stats || []).find((x) => x.name === name); return s ? num(s.value != null ? s.value : s.displayValue) : null; };
 
@@ -2212,8 +2272,13 @@ window.TEAMSHEET_VERSION='202611211800';
       const ev = { id: sum.header.id || comp.id, date: comp.date, season: sum.header.season, competitions: [comp], league: sum.header.league };
       const item = basicItem(ev, slug);
       const finished = ['FT', 'AET', 'PEN'].includes(item.fixture.status.short);
+      const live = ['LIVE', 'HT'].includes(item.fixture.status.short);
+      const st0 = comp.status || {};
+      const liveMin = live ? Math.min(90, Math.max(1, parseInt(String((st0.type && st0.type.shortDetail) || st0.displayClock || '0'), 10) || (st0.type && st0.type.name === 'STATUS_HALFTIME' ? 45 : 1))) : null;
+      if (live) item.fixture.status.elapsed = liveMin;
+      const withStats = finished || live;
       const teams = (sum.boxscore && sum.boxscore.teams) || [];
-      item.statistics = finished ? teams.map((t) => {
+      item.statistics = withStats ? teams.map((t) => {
         const S = t.statistics || [];
         const v = (n) => statVal(S, n);
         return { team: { id: +t.team.id }, statistics: [
@@ -2225,21 +2290,34 @@ window.TEAMSHEET_VERSION='202611211800';
       }).filter((b) => b.statistics.some((x) => x.type === 'Total Shots' && x.value != null)) : [];
       const rosters = sum.rosters || [];
       item.lineups = rosters.filter((r) => (r.roster || []).some((p) => p.starter)).map((r) => {
-        const pl = (p) => ({ player: { id: +p.athlete.id, name: p.athlete.displayName, number: p.jersey != null ? +p.jersey : null, pos: POS(p.position && p.position.abbreviation) || 'M', grid: null } });
+        const pl = (p) => ({ player: { id: +p.athlete.id, name: p.athlete.displayName, number: p.jersey != null ? +p.jersey : null, pos: POS(p.position && p.position.abbreviation) || 'M', grid: null, detail: p.position ? p.position.abbreviation : null } });
         return { team: { id: +r.team.id, name: r.team.displayName, logo: null }, formation: r.formation || null, coach: null,
           startXI: r.roster.filter((p) => p.starter).map(pl), substitutes: r.roster.filter((p) => !p.starter).map(pl) };
       });
-      item.players = finished ? rosters.map((r) => ({ team: { id: +r.team.id }, players: (r.roster || []).map((p) => {
+      item.players = withStats ? rosters.map((r) => ({ team: { id: +r.team.id }, players: (r.roster || []).map((p) => {
         const S = p.stats || [];
         const v = (n) => statVal(S, n);
-        const min = minutesOf(p);
+        const min = minutesOf(p, finished ? 90 : liveMin);
+        const sentOff = (p.plays || []).some((x) => x.redCard);
         const pos = POS(p.position && p.position.abbreviation);
         return { player: { id: +p.athlete.id, name: p.athlete.displayName }, statistics: [{
-          games: { minutes: min > 0 ? min : null, number: p.jersey != null ? +p.jersey : null, position: pos, rating: null, captain: false, substitute: !p.starter },
+          games: { minutes: min > 0 ? min : null, number: p.jersey != null ? +p.jersey : null, position: pos, rating: null, captain: false, substitute: !p.starter, onPitch: live ? (p.starter || p.subbedIn) && !p.subbedOut && !sentOff : undefined },
           shots: { total: v('totalShots'), on: v('shotsOnTarget') }, goals: { total: v('totalGoals'), conceded: v('goalsConceded'), assists: v('goalAssists'), saves: v('saves') },
           fouls: { drawn: v('foulsSuffered'), committed: v('foulsCommitted') }, cards: { yellow: v('yellowCards'), red: v('redCards') } }] };
       }) })) : [];
-      item.events = [];
+      item.events = (sum.keyEvents || []).map((k) => {
+        const tt = (k.type && k.type.text) || '';
+        let type = null, detail = tt;
+        if (/^goal|penalty - scored|own goal/i.test(tt)) type = 'Goal';
+        else if (/yellow card/i.test(tt)) { type = 'Card'; detail = 'Yellow Card'; }
+        else if (/red card/i.test(tt)) { type = 'Card'; detail = 'Red Card'; }
+        else if (/substitution/i.test(tt)) type = 'subst';
+        if (!type) return null;
+        const pp = (k.participants || []).map((x) => x.athlete || {});
+        const m = String((k.clock && k.clock.displayValue) || '').match(/(\d+)'?(?:\s*\+\s*(\d+))?/);
+        return { time: { elapsed: m ? +m[1] : null, extra: m && m[2] ? +m[2] : null }, team: { id: k.team ? +k.team.id : null, name: k.team ? k.team.displayName : null },
+          player: { id: pp[0] ? +pp[0].id : null, name: pp[0] ? pp[0].displayName : null }, assist: { id: pp[1] ? +pp[1].id : null, name: pp[1] ? pp[1].displayName : null }, type, detail };
+      }).filter(Boolean);
       item._odds = oddsItem(sum, item);
       return item;
     }
@@ -2329,7 +2407,7 @@ window.TEAMSHEET_VERSION='202611211800';
             const ids = getLeagueIds().filter((id) => byId.has(+id));
             const lists = await pmap(ids, async (id) => {
               const slug = byId.get(+id);
-              const j = await getJSON(`${BASE}/${slug}/scoreboard?dates=${d}`, 5 * 60000);
+              const j = await getJSON(`${BASE}/${slug}/scoreboard?dates=${d}`, 30000);
               return ((j && j.events) || []).map((ev) => basicItem(ev, slug));
             });
             return ok(path, p, lists.flat().filter((x) => londonDate(x.fixture.timestamp * 1000) === p.date).map(strip));
@@ -2661,6 +2739,40 @@ window.TEAMSHEET_VERSION='202611211800';
       out.sort((x, y) => (order[x.status] - order[y.status]) || (y.pPlay - x.pPlay) || ('GDMF'.indexOf(x.pos) - 'GDMF'.indexOf(y.pos)));
       return out;
     }
+    /* With confirmed line-ups and detailed positions, nudge fouls committed and fouls drawn by the direct opponent's
+       habits (a full-back facing a winger who draws lots of fouls). Small by design: testing showed only a slight gain. */
+    function applyMatchups(fx, players, apps, priors, refTs) {
+      const lu = fx.lineups;
+      if (!lu || !lu[fx.home.id] || !lu[fx.away.id]) return;
+      const det = new Map();
+      for (const tid of [fx.home.id, fx.away.id]) for (const x of lu[tid].xi) det.set(x.id, { zone: P.zoneOf(x.detail), detail: x.detail, team: tid });
+      if (![...det.values()].some((d) => d.zone)) return;
+      const rel = (pid, stat, pos) => { const a = apps.get(pid) || []; const r = P.playerRate(a, stat, priors, refTs, { pos }); return r.rate / Math.max(priors[stat][r.pos].mean, 1e-6); };
+      for (const side of ['home', 'away']) {
+        const oppSide = side === 'home' ? 'away' : 'home';
+        const opps = players[oppSide].filter((p) => p.status === 'start' && det.get(p.id)).map((p) => ({ p, zone: det.get(p.id).zone }));
+        for (const pl of players[side]) {
+          const d = det.get(pl.id);
+          if (!d || !d.zone || pl.pos === 'G' || pl.status !== 'start') continue;
+          const dos = P.directOpponents(d.zone, opps);
+          if (!dos.length) continue;
+          let w = 0, lfd = 0, lfc = 0;
+          for (const { o, w: ww } of dos) { w += ww; lfd += ww * Math.log(rel(o.p.id, 'fd', o.p.pos)); lfc += ww * Math.log(rel(o.p.id, 'fc', o.p.pos)); }
+          const gFd = Math.exp(lfd / w), gFc = Math.exp(lfc / w);
+          const adj = { fc: Math.pow(gFd, P.MATCHUP_BETA), fd: Math.pow(gFc, P.MATCHUP_BETA) };
+          const a = apps.get(pl.id) || [];
+          const sc = P.minutesScenarios(a, { status: 'start' });
+          for (const st of ['fc', 'fd']) {
+            const pr = pl.pred[st];
+            pr.factor = pr.factor * adj[st];
+            const pmf = P.playerStatPmf(pr.rate90, sc, pr.factor, P.DEFAULTS.dispersion[st]);
+            Object.assign(pr, { pmf, mean: S.mean(pmf), p1: S.atLeast(pmf, 1), p2: S.atLeast(pmf, 2), p3: S.atLeast(pmf, 3), p4: S.atLeast(pmf, 4) });
+          }
+          const main = dos.slice().sort((x, y) => y.w - x.w)[0].o.p;
+          pl.matchup = { opponent: main.name, oppFd: gFd, oppFc: gFc, adjFc: adj.fc, adjFd: adj.fd };
+        }
+      }
+    }
     function benchProb(apps) {
       let b = 0, on = 0;
       for (const a of apps.slice(0, 15)) if (!a.start && (a.bench || a.min > 0)) { b++; if (a.min > 0) on++; }
@@ -2821,6 +2933,7 @@ window.TEAMSHEET_VERSION='202611211800';
         home: playerPredictions(fx, 'home', squads.home, apps, priors, models, team, refTs),
         away: playerPredictions(fx, 'away', squads.away, apps, priors, models, team, refTs),
       };
+      applyMatchups(fx, players, apps, priors, refTs);
       for (const side of ['home', 'away']) for (const p of players[side]) p.log = playerLog(p.id, side === 'home' ? homeFx : awayFx);
       if (settings.source === 'espn' && !confirmed && !D.isFinished(fx)) notes.push('ESPN does not publish injury or suspension lists, so the predicted line-ups come from recent matches only. Check team news before betting on a player.');
       if (!confirmed && !D.isFinished(fx)) notes.push('Line-ups are not confirmed yet. Player numbers use a predicted line-up from recent matches and injury news. Analyse again about an hour before kick-off to use the confirmed team sheets.');
@@ -2915,7 +3028,13 @@ window.TEAMSHEET_VERSION='202611211800';
       const info = await leagueInfo(leagueId);
       const j = await client.get('fixtures', { league: leagueId, season: info.season, timezone: settings.tz }, H3);
       const now = Date.now();
-      const list = j.response.map(D.normFixture).filter((f) => f.ts > now - 3 * 3600000 && f.ts < now + (days || 10) * DAY && !D.isFinished(f)).sort((a, b) => a.ts - b.ts);
+      // today's finished matches stay listed (with scores) until midnight; live ones show their score and minute
+      const todayStart = Date.parse(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now) + 'T00:00:00Z') - 3600000;
+      // overlay today's live scores (the season list is cached for longer)
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      const fresh = new Map();
+      try { const t = await client.get('fixtures', { date: today, timezone: settings.tz }, 45000); for (const it of t.response) fresh.set(it.fixture.id, D.normFixture(it)); } catch (e) { /* keep cached list */ }
+      const list = j.response.map(D.normFixture).map((f) => fresh.get(f.id) || f).filter((f) => f.ts < now + (days || 10) * DAY && (D.isFinished(f) ? f.ts > Math.max(todayStart, now - 14 * 3600000) : f.ts > now - 4 * 3600000) && !['PST', 'CANC', 'ABD'].includes(f.status)).sort((a, b) => a.ts - b.ts);
       return { info, list };
     }
     async function teams(leagueId) {
@@ -2924,10 +3043,179 @@ window.TEAMSHEET_VERSION='202611211800';
       return j.response.map((x) => x.team).sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    return { analyseFixture, analyseTeams, scanDay, upcoming, teams, leagueInfo, leagueSeason, settings, client };
+    /* Latest score, team stats, player stats and events for a live (or just finished) match. */
+    async function liveUpdate(fid) {
+      const j = await client.get('fixtures', { id: fid, timezone: settings.tz }, 20000);
+      if (!j.response.length) throw new FP.api.ApiError('api', 'Match not found');
+      return D.normFixture(j.response[0]);
+    }
+
+    return { liveUpdate, analyseFixture, analyseTeams, scanDay, upcoming, teams, leagueInfo, leagueSeason, settings, client };
   }
 
   FP.engine = { create, LEAGUE_PRESETS, EXTRA_PRESETS, DEMO_LEAGUES, STATS };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+/* ===== tracker.js ===== */
+/* Bet tracker: logged bets, automatic settlement from results, profit and loss, and how picks performed. */
+(function (root) {
+  'use strict';
+  const FP = (root.FP = root.FP || {});
+
+  const KEY = 'teamsheet.bets.v1';
+  const SETTLE_AFTER = 115 * 60000; // a match is worth checking about two hours after kick-off
+
+  function load(storage) {
+    try { const v = JSON.parse((storage || root.localStorage).getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function save(bets, storage) {
+    try { (storage || root.localStorage).setItem(KEY, JSON.stringify(bets)); return true; } catch (e) { return false; }
+  }
+
+  function newId() { return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  /* legs: bet-builder legs {label, match, fixtureId, kickoff, p, family, level, group, isPlayer, playerId, odds(text)} */
+  function createBet(legs, stake, oddsDec, book, parseOdds) {
+    const copy = legs.map((l) => ({
+      label: l.label, match: l.match, fixtureId: l.fixtureId, kickoff: l.kickoff || null, p: l.p, family: l.family || null,
+      level: l.level != null ? l.level : null, group: l.group || '', isPlayer: !!l.isPlayer, playerId: l.playerId || null,
+      odds: l.odds ? (parseOdds ? parseOdds(l.odds) : null) : null, result: null,
+    }));
+    return { id: newId(), placedAt: Date.now(), stake: +stake, odds: +oddsDec, book: book || '', legs: copy, status: 'open', returns: null, settledAt: null, manual: false };
+  }
+
+  /* Result of one leg against a finished match: true, false, 'void' (player did not play) or null (cannot tell). */
+  function settleLeg(leg, f) {
+    if (!f || !FP.data.isFinished(f)) return null;
+    let family = leg.family || '', level = leg.level;
+    const live = family.match(/^live-(corners|cards|sot|shots|fouls|saves)-o$/);
+    if (live) family = `${live[1]}-tot-o`;
+    if (!family) return null;
+    const r = FP.markets.settle({ family, level }, f);
+    if (r == null && /^p-/.test(family)) {
+      // player bets: did he take part at all?
+      const pid = family.replace(/^p-[a-z]+-/, '');
+      const pl = (f.players || []).find((x) => String(x.id) === pid);
+      if (f.players && (!pl || !pl.min)) return 'void';
+    }
+    return r;
+  }
+
+  /* Combine leg results into a bet result. Void legs drop out (their odds are removed when known). */
+  function settleBet(bet) {
+    if (bet.manual) return bet;
+    const rs = bet.legs.map((l) => l.result);
+    if (rs.some((x) => x === false)) return Object.assign(bet, { status: 'lost', returns: 0, settledAt: bet.settledAt || Date.now() });
+    if (rs.some((x) => x == null)) return Object.assign(bet, { status: 'open', returns: null, settledAt: null });
+    const live = bet.legs.filter((l) => l.result !== 'void');
+    if (!live.length) return Object.assign(bet, { status: 'void', returns: bet.stake, settledAt: Date.now() });
+    let odds = bet.odds;
+    if (live.length < bet.legs.length) {
+      // a void leg: re-price from the remaining legs' own odds if we have them, otherwise flag it
+      if (live.every((l) => l.odds)) odds = live.reduce((a, l) => a * l.odds, 1);
+      else return Object.assign(bet, { status: 'check', returns: null, settledAt: Date.now() });
+    }
+    return Object.assign(bet, { status: 'won', returns: +(bet.stake * odds).toFixed(2), settledAt: bet.settledAt || Date.now() });
+  }
+
+  /* Fixtures that open bets are waiting on. */
+  function pendingFixtures(bets, now) {
+    const ids = new Set();
+    for (const b of bets) {
+      if (b.status !== 'open' || b.manual) continue;
+      for (const l of b.legs) if (l.result == null && l.fixtureId != null && !String(l.fixtureId).startsWith('hypo') && (!l.kickoff || now - l.kickoff > SETTLE_AFTER)) ids.add(l.fixtureId);
+    }
+    return [...ids];
+  }
+
+  function applyResults(bets, fixturesById) {
+    let changed = 0;
+    for (const b of bets) {
+      if (b.status !== 'open' || b.manual) continue;
+      for (const l of b.legs) {
+        if (l.result != null) continue;
+        const f = fixturesById.get(l.fixtureId) || fixturesById.get(String(l.fixtureId)) || fixturesById.get(+l.fixtureId);
+        const r = settleLeg(l, f);
+        if (r != null) { l.result = r; changed++; }
+      }
+      const before = b.status;
+      settleBet(b);
+      if (b.status !== before) changed++;
+    }
+    return changed;
+  }
+
+  function setManual(bet, status) {
+    bet.manual = status !== 'auto';
+    if (status === 'auto') { bet.manual = false; for (const l of bet.legs) l.result = null; return settleBet(bet); }
+    bet.status = status; bet.settledAt = Date.now();
+    bet.returns = status === 'won' ? +(bet.stake * bet.odds).toFixed(2) : status === 'void' ? bet.stake : status === 'lost' ? 0 : null;
+    return bet;
+  }
+
+  function summary(bets, since) {
+    const s = { bets: 0, open: 0, won: 0, lost: 0, void: 0, check: 0, staked: 0, returned: 0, openStake: 0 };
+    for (const b of bets) {
+      if (since && b.placedAt < since) continue;
+      s.bets++;
+      if (b.status === 'open' || b.status === 'check') { s.open++; s.openStake += b.stake; if (b.status === 'check') s.check++; continue; }
+      s[b.status]++;
+      s.staked += b.stake; s.returned += b.returns || 0;
+    }
+    s.profit = s.returned - s.staked;
+    s.roi = s.staked > 0 ? s.profit / s.staked : null;
+    s.strike = s.won + s.lost > 0 ? s.won / (s.won + s.lost) : null;
+    return s;
+  }
+
+  /* How the model's chances held up on the legs you actually bet. */
+  function calibration(bets, since) {
+    const bands = [[0, 0.5], [0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.01]].map(([lo, hi]) => ({ lo, hi, n: 0, p: 0, won: 0 }));
+    const groups = new Map();
+    let n = 0, p = 0, won = 0, valueN = 0, valueSum = 0;
+    for (const b of bets) {
+      if (since && b.placedAt < since) continue;
+      for (const l of b.legs) {
+        if (l.result !== true && l.result !== false) continue;
+        const y = l.result === true ? 1 : 0;
+        n++; p += l.p; won += y;
+        const band = bands.find((x) => l.p >= x.lo && l.p < x.hi); band.n++; band.p += l.p; band.won += y;
+        const g = l.isPlayer ? 'Player bets' : l.group || 'Other';
+        const G = groups.get(g) || { n: 0, p: 0, won: 0 }; G.n++; G.p += l.p; G.won += y; groups.set(g, G);
+        if (l.odds) { valueN++; valueSum += l.p * l.odds - 1; }
+      }
+    }
+    return { n, expected: n ? p / n : null, actual: n ? won / n : null, bands: bands.filter((x) => x.n), groups: [...groups.entries()].map(([g, v]) => Object.assign({ g }, v)).sort((a, b) => b.n - a.n), avgValue: valueN ? valueSum / valueN : null };
+  }
+
+  function toCSV(bets) {
+    const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = [['Placed', 'Status', 'Stake', 'Odds', 'Returns', 'Profit', 'Bookmaker', 'Selections', 'Model chance of all legs'].map(q).join(',')];
+    for (const b of bets) {
+      const pAll = b.legs.reduce((a, l) => a * l.p, 1);
+      const profit = b.returns != null ? b.returns - b.stake : '';
+      rows.push([new Date(b.placedAt).toISOString().slice(0, 16).replace('T', ' '), b.status, b.stake.toFixed(2), b.odds.toFixed(2), b.returns != null ? b.returns.toFixed(2) : '', profit !== '' ? profit.toFixed(2) : '', b.book,
+        b.legs.map((l) => `${l.label} [${l.result === true ? 'won' : l.result === false ? 'lost' : l.result === 'void' ? 'void' : 'open'}]`).join(' + '), (pAll * 100).toFixed(1) + '%'].map(q).join(','));
+    }
+    return rows.join('\n');
+  }
+
+  function importJSON(text, existing) {
+    const v = JSON.parse(text);
+    const arr = Array.isArray(v) ? v : v && Array.isArray(v.bets) ? v.bets : null;
+    if (!arr) throw new Error('That is not a Teamsheet bet backup.');
+    const ids = new Set(existing.map((b) => b.id));
+    let added = 0;
+    for (const b of arr) {
+      if (!b || !b.id || !Array.isArray(b.legs) || !(b.stake > 0) || !(b.odds > 1)) continue;
+      if (ids.has(b.id)) continue;
+      existing.push(b); ids.add(b.id); added++;
+    }
+    existing.sort((a, b) => b.placedAt - a.placedAt);
+    return added;
+  }
+
+  FP.tracker = { KEY, load, save, createBet, settleLeg, settleBet, pendingFixtures, applyResults, setManual, summary, calibration, toCSV, importJSON, SETTLE_AFTER };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
 /* ===== ui.js ===== */
@@ -2973,8 +3261,8 @@ window.TEAMSHEET_VERSION='202611211800';
   function saveSettings() { try { localStorage.setItem(SKEY, JSON.stringify(state.settings)); } catch (e) { /* private mode */ } }
 
   const state = {
-    settings: loadSettings(), view: 'match', status: null, statusErr: null,
-    match: { league: null, mode: 'fixtures', list: null, teams: null, home: '', away: '', report: null, loading: null, error: null, tab: 'picks', side: 'home', open: new Set(), pickList: 'best' },
+    settings: loadSettings(), view: 'match', status: null, statusErr: null, slip: [], slipOpen: false, bets: [], betsUi: { period: 'all', show: 20, armed: null, busy: false, msg: '', keep: false },
+    match: { league: null, mode: 'fixtures', list: null, teams: null, home: '', away: '', report: null, loading: null, error: null, tab: 'picks', side: 'home', open: new Set(), pickList: 'best', live: null, liveSide: 'home', liveErr: null },
     day: { date: londonISO(Date.now()), leagues: null, report: null, loading: null, error: null, tab: 'best', group: 'all' },
   };
 
@@ -3025,6 +3313,111 @@ window.TEAMSHEET_VERSION='202611211800';
     return (e && e.message) || String(e);
   }
 
+
+  /* ---------- fractional odds ---------- */
+  const LADDER = [[1,100],[1,50],[1,33],[1,25],[1,20],[1,16],[1,14],[1,12],[1,10],[1,9],[1,8],[1,7],[2,13],[1,6],[2,11],[1,5],[2,9],[1,4],[2,7],[3,10],[1,3],[4,11],[2,5],[4,9],[1,2],[8,15],[4,7],[8,13],[4,6],[8,11],[4,5],[5,6],[10,11],[1,1],[21,20],[11,10],[6,5],[5,4],[11,8],[6,4],[13,8],[7,4],[15,8],[2,1],[9,4],[5,2],[11,4],[3,1],[10,3],[7,2],[4,1],[9,2],[5,1],[11,2],[6,1],[13,2],[7,1],[15,2],[8,1],[9,1],[10,1],[11,1],[12,1],[14,1],[16,1],[18,1],[20,1],[22,1],[25,1],[28,1],[33,1],[40,1],[50,1],[66,1],[80,1],[100,1],[150,1],[200,1],[250,1],[500,1]];
+  function frac(dec) {
+    if (!dec || !isFinite(dec) || dec <= 1) return '–';
+    let best = LADDER[0], bd = Infinity;
+    for (const fr of LADDER) { const d = Math.abs(Math.log(1 + fr[0] / fr[1]) - Math.log(dec)); if (d < bd) { bd = d; best = fr; } }
+    return best[0] === best[1] ? 'Evs' : `${best[0]}/${best[1]}`;
+  }
+  const fairDec = (p) => (p > 0.0005 ? 1 / p : null);
+  function parseOdds(txt) {
+    const t = String(txt || '').trim().toLowerCase();
+    if (!t) return null;
+    if (t === 'evs' || t === 'evens') return 2;
+    const m = t.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if (m && +m[2] > 0) return 1 + +m[1] / +m[2];
+    const d = parseFloat(t);
+    return isFinite(d) && d > 1 ? d : null;
+  }
+  // price text for a market: bookmaker price if attached, otherwise the model's fair price
+  function priceText(m) {
+    if (m.price) return `<span class="odds">${esc(frac(m.price))}</span> <span class="muted">${esc(m.priceBook)}</span>`;
+    return `<span class="odds fair">${esc(frac(fairDec(m.p)))}</span> <span class="muted">fair</span>`;
+  }
+
+  /* ---------- bet builder ---------- */
+  const addReg = new Map(); let addSeq = 0;
+  function addBtn(leg, label) {
+    const k = 'a' + (++addSeq); addReg.set(k, leg);
+    const inSlip = state.slip.some((x) => x.id === leg.id);
+    return `<button class="addbtn${inSlip ? ' on' : ''}" data-act="add" data-k="${k}" aria-label="${inSlip ? 'Remove from' : 'Add to'} bet builder: ${esc(leg.label)}">${label || (inSlip ? '✓' : '+')}</button>`;
+  }
+  function legOf(m) {
+    return { id: m.id || (m.fixtureId + ':' + m.label), label: m.label, match: m.match, fixtureId: m.fixtureId, kickoff: m.kickoff, p: m.p, group: m.group, family: m.family, level: m.level,
+      isPlayer: !!m.isPlayer, playerId: m.playerId || null, price: m.price || null, book: m.priceBook || null, odds: m.price ? frac(m.price) : '' };
+  }
+  function findMarket(r, family, level) { return r.markets.find((x) => x.family === family && x.level === level) || null; }
+  function adHocLeg(r, family, level, label, p) {
+    const m = findMarket(r, family, level);
+    if (m) return legOf(m);
+    const f = r.fixture;
+    return { id: f.id + ':' + label, label, match: `${f.home.name} v ${f.away.name}`, fixtureId: f.id, kickoff: f.ts, p, group: family.startsWith('p-') ? 'Player' : 'Match', family, level, isPlayer: family.startsWith('p-'), playerId: family.startsWith('p-') ? family.replace(/^p-[a-z]+-/, '') : null, price: null, odds: '' };
+  }
+  const SLIPKEY = 'teamsheet.slip.v1';
+  function loadSlip() { try { return JSON.parse(localStorage.getItem(SLIPKEY) || '[]'); } catch (e) { return []; } }
+  function saveSlip() { try { localStorage.setItem(SLIPKEY, JSON.stringify(state.slip)); } catch (e) { /* ignore */ } }
+  function toggleLeg(leg) {
+    const i = state.slip.findIndex((x) => x.id === leg.id);
+    if (i >= 0) { state.slip.splice(i, 1); saveSlip(); return false; }
+    // one line per market: picking "2+ fouls" replaces "1+ fouls" for the same player
+    const j = state.slip.findIndex((x) => x.fixtureId === leg.fixtureId && x.family && x.family === leg.family);
+    if (j >= 0) state.slip.splice(j, 1);
+    state.slip.push(Object.assign({}, leg)); saveSlip(); return true;
+  }
+  const LINKED = new Set(['Result', 'Goals', 'Shots', 'Shots on target', 'Goalkeeper saves']);
+  function slipTotals() {
+    const legs = state.slip;
+    const p = legs.reduce((a, l) => a * l.p, 1);
+    const decs = legs.map((l) => parseOdds(l.odds) || null);
+    const all = decs.every((d) => d);
+    const dec = all ? decs.reduce((a, d) => a * d, 1) : null;
+    const byMatch = new Map();
+    for (const l of legs) { const k = l.fixtureId; if (!byMatch.has(k)) byMatch.set(k, []); byMatch.get(k).push(l); }
+    const sameMatch = [...byMatch.values()].some((a) => a.length > 1);
+    const linked = [...byMatch.values()].some((a) => a.filter((l) => LINKED.has(l.group)).length > 1);
+    return { p, dec, fairDec: fairDec(p), value: dec ? p * dec - 1 : null, sameMatch, linked, missing: decs.filter((d) => !d).length };
+  }
+  function slipBar() {
+    if (!state.slip.length || state.view === 'settings') return '';
+    const t = slipTotals();
+    return `<button class="slipbar" data-act="slip-open"><span>Bet builder: ${state.slip.length} selection${state.slip.length === 1 ? '' : 's'}</span><span>${pct(t.p)}${t.dec ? ', ' + esc(frac(t.dec)) : ''}</span></button>`;
+  }
+  function viewSlip() {
+    const legs = state.slip, t = slipTotals();
+    if (!legs.length) return `<div class="panel"><h2>Bet builder</h2><p class="muted">Tap + next to any pick, player chance or line to add it here.</p><button class="btn secondary wide" data-act="slip-close">Back</button></div>`;
+    const rows = legs.map((l, i) => {
+      const d = parseOdds(l.odds);
+      const v = d ? l.p * d - 1 : null;
+      return `<div class="pick"><div class="top-line"><div class="lbl">${esc(l.label)}</div><div class="prob">${pct(l.p)}</div></div>
+        <div class="sub"><span>${esc(l.match)}${l.kickoff ? ', ' + fmtShort(l.kickoff) + ' ' + fmtTime(l.kickoff) : ''}</span><span>Fair odds ${esc(frac(fairDec(l.p)))}</span>${l.book ? `<span>${esc(l.book)}</span>` : ''}</div>
+        <div class="row" style="margin-top:8px"><label class="small grow" for="odds-${i}">Bookmaker odds</label><input class="oddsin" id="odds-${i}" data-bind="legOdds" data-i="${i}" inputmode="text" placeholder="e.g. ${esc(frac(fairDec(l.p)))}" value="${esc(l.odds || '')}">
+        <button class="addbtn on" data-act="slip-remove" data-i="${i}" aria-label="Remove ${esc(l.label)}">×</button></div>
+        ${v != null ? `<div class="small ${v > 0 ? 'value' : 'novalue'}" style="margin-top:4px">${v > 0 ? 'Value: +' + Math.round(v * 100) + '% expected return' : 'No value: the price is shorter than the chance deserves'}</div>` : ''}</div>`;
+    }).join('');
+    const warn = t.linked ? '<div class="note">Some legs from the same match depend on each other (for example goals and shots). The real chance of all landing differs from the simple product, and bookmakers price bet builders with this in mind, so their combined odds will not match the figure below.</div>' : t.sameMatch ? '<div class="note">Several legs come from the same match. They are treated as independent, which is roughly right for different players and markets.</div>' : '';
+    return `<div class="panel"><div class="row"><h2 class="grow">Bet builder</h2><button class="chip" data-act="slip-close">Close</button></div>
+      <p class="small muted">Type the odds from Sky Bet, Paddy Power or Betfair (fractions like 4/11 or decimals like 1.36) to see whether each leg and the whole bet is good value.</p>
+      ${rows}${warn}
+      <div class="lucky-total"><div><div>All ${legs.length} win</div><div class="small muted">Fair odds ${esc(frac(t.fairDec))}</div></div><div class="prob">${pct(t.p)}</div></div>
+      ${t.dec ? `<div class="row" style="margin-top:8px"><span class="grow">Your combined odds <b>${esc(frac(t.dec))}</b> (${t.dec.toFixed(2)})</span><span class="${t.value > 0 ? 'value' : 'novalue'}">${t.value > 0 ? 'Value +' + Math.round(t.value * 100) + '%' : 'No value'}</span></div>` : `<p class="small muted">Add odds for ${t.missing} more leg${t.missing === 1 ? '' : 's'} to see the combined price and value.</p>`}
+      <div class="row" style="margin-top:12px"><button class="btn secondary grow" data-act="slip-copy">Copy</button><button class="btn secondary grow" data-act="slip-clear">Clear all</button></div></div>
+      ${logForm(t)}`;
+  }
+  function logForm(t) {
+    const ui = state.betsUi;
+    return `<div class="panel" id="logform"><h3>Log this bet</h3><p class="small muted">Placed it? Log it here and the app settles it from the result and tracks your profit and loss. Nothing is placed with a bookmaker.</p>
+      <div class="row"><div class="grow"><label class="field" for="log-stake">Stake (£)</label><input type="number" id="log-stake" inputmode="decimal" min="0" step="0.01" placeholder="5.00"></div>
+      <div class="grow"><label class="field" for="log-odds">Odds you got</label><input type="text" id="log-odds" placeholder="e.g. 9/2 or 5.5" value="${esc(t.dec ? t.dec.toFixed(2) : '')}"></div></div>
+      <label class="field" for="log-book">Bookmaker</label><input type="text" id="log-book" list="books" placeholder="Sky Bet" value="${esc(state.settings.lastBook || '')}">
+      <datalist id="books"><option value="Sky Bet"><option value="Paddy Power"><option value="Betfair"><option value="Betfair Exchange"><option value="bet365"><option value="William Hill"></datalist>
+      <div class="toggle"><input type="checkbox" id="log-keep" ${ui.keep ? 'checked' : ''}><label for="log-keep">Keep these selections in the builder</label></div>
+      <p class="small muted">The odds box starts with your legs multiplied together. Change it to the exact price on your bet slip; bookmaker bet builders often differ.</p>
+      <button class="btn wide" data-act="log-bet">Log bet</button></div>`;
+  }
+
   /* ---------- rendering helpers ---------- */
   function crest(team) {
     if (team.logo && state.settings.source !== 'demo') return `<img class="crest" src="${esc(team.logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
@@ -3040,6 +3433,7 @@ window.TEAMSHEET_VERSION='202611211800';
   function progressBlock(msg) { return `<div class="panel progress"><div class="ball" aria-hidden="true"></div><div class="msg" id="progress-msg">${esc(msg || 'Working')}</div></div>`; }
   function setProgress(msg) { const el = $('#progress-msg'); if (el) el.textContent = msg; }
   function toast(msg) {
+    document.querySelectorAll('.toast').forEach((x) => x.remove());
     const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
     setTimeout(() => t.remove(), 2200);
   }
@@ -3057,14 +3451,18 @@ window.TEAMSHEET_VERSION='202611211800';
   }
   function render() {
     const app = $('#app');
-    const nav = ['match', 'day', 'settings'].map((v) => `<a href="#${v}" ${state.view === v ? 'aria-current="page"' : ''}>${{ match: 'Match', day: 'Day', settings: 'Settings' }[v]}</a>`).join('');
+    const nav = ['match', 'day', 'bets', 'settings'].map((v) => `<a href="#${v}" ${state.view === v ? 'aria-current="page"' : ''}>${{ match: 'Match', day: 'Day', bets: 'Bets', settings: 'Settings' }[v]}</a>`).join('');
     const demo = state.settings.source === 'demo' ? `<div class="demo-band">Demo mode: fictional leagues with simulated data. ${IN_CLAUDE ? 'Real matches need your own copy of the app, because this preview blocks outside data.' : 'Switch the data source to ESPN in Settings for real matches.'}</div>` : '';
     app.innerHTML = `<header class="top" id="topbar"></header>${demo}<main id="main"></main><nav class="tabs" aria-label="Sections">${nav}</nav>`;
     renderTop();
     const main = $('#main');
-    if (state.view === 'match') main.innerHTML = state.match.report ? viewReport(state.match.report) : viewMatchPicker();
+    addReg.clear();
+    if (state.slipOpen) main.innerHTML = viewSlip();
+    else if (state.view === 'match') main.innerHTML = state.match.report ? viewReport(state.match.report) : viewMatchPicker();
     else if (state.view === 'day') main.innerHTML = viewDay();
+    else if (state.view === 'bets') main.innerHTML = viewBets();
     else main.innerHTML = viewSettings();
+    if (!state.slipOpen) main.insertAdjacentHTML('beforeend', slipBar());
   }
 
   /* ---------- match picker ---------- */
@@ -3079,14 +3477,16 @@ window.TEAMSHEET_VERSION='202611211800';
     if (m.loading) body += progressBlock(m.loading);
     else if (m.mode === 'fixtures') {
       if (!m.list) { loadFixtures(); body += progressBlock('Loading fixtures'); }
-      else if (!m.list.length) body += '<div class="empty">No matches in the next 10 days for this competition.</div>';
+      else if (!m.list.length) body += '<div class="empty">No matches today or in the next 10 days for this competition.</div>';
       else {
         let lastDay = '';
         for (const f of m.list) {
           const d = fmtDay(f.ts);
           if (d !== lastDay) { body += `<div class="day-head">${esc(d)}</div>`; lastDay = d; }
-          const live = D.isLive(f) ? '<span class="tag">Live</span>' : '';
-          body += `<button class="fx" data-act="analyse" data-id="${f.id}"><span class="ko">${fmtTime(f.ts)}</span><span class="teams"><div>${crest(f.home)} ${esc(f.home.name)}</div><div>${crest(f.away)} ${esc(f.away.name)}</div></span>${live}</button>`;
+          const isLive = D.isLive(f), done = D.isFinished(f);
+          const tag = isLive ? `<span class="tag live">${f.status === 'HT' ? 'HT' : (f.elapsed ? f.elapsed + "'" : 'Live')}</span>` : done ? '<span class="tag ft">FT</span>' : '';
+          const sc = (k) => (isLive || done) && f.goals ? `<b class="sc">${f.goals[k]}</b>` : '';
+          body += `<button class="fx${isLive ? ' is-live' : ''}" data-act="analyse" data-id="${f.id}"><span class="ko">${fmtTime(f.ts)}</span><span class="teams"><div>${crest(f.home)} ${esc(f.home.name)}${sc('h')}</div><div>${crest(f.away)} ${esc(f.away.name)}${sc('a')}</div></span>${tag}</button>`;
         }
       }
     } else {
@@ -3122,11 +3522,113 @@ window.TEAMSHEET_VERSION='202611211800';
     try {
       const e = await getEngine();
       const rep = await fn(e, (msg) => { m.loading = msg; setProgress(msg); });
-      m.report = rep; m.tab = 'picks'; m.side = 'home'; m.open = new Set(); m.pickList = 'best';
+      m.report = rep; m.side = 'home'; m.open = new Set(); m.pickList = 'best'; m.live = null; m.liveErr = null;
+      m.tab = hasLive(rep) ? 'live' : 'picks';
+      if (hasLive(rep)) refreshLive();
       location.hash = 'match';
       window.scrollTo(0, 0);
     } catch (err) { m.error = friendlyError(err); }
     m.loading = null; render(); refreshStatus();
+  }
+
+
+  /* ---------- live match ---------- */
+  function hasLive(r) {
+    const f = r.fixture;
+    if (f.hypothetical) return false;
+    return D.isLive(f) || (Date.now() >= f.ts - 5 * 60000 && Date.now() - f.ts < 14 * 3600000) || (D.isFinished(f) && Date.now() - f.ts < 14 * 3600000);
+  }
+  let liveTimer = null;
+  async function refreshLive() {
+    clearTimeout(liveTimer);
+    const m = state.match, r = m.report;
+    if (!r || !hasLive(r)) return;
+    try {
+      const e = await getEngine();
+      const L = await e.liveUpdate(r.fixture.id);
+      if (state.match.report !== r) return;
+      m.live = L; m.liveErr = null; m.liveAt = Date.now();
+    } catch (err) { m.liveErr = friendlyError(err); }
+    if (state.view === 'match' && state.match.report === r && !state.slipOpen && (m.tab === 'live' || m.tab === 'liveplayers')) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+    else if (state.view === 'match' && state.match.report === r) renderTop();
+    if (m.live && !D.isFinished(m.live)) liveTimer = setTimeout(refreshLive, 60000);
+  }
+  // chance a count reaches k by full time, given what has happened and the expected rate for the rest
+  const remainP = (cur, lamRest, k) => (cur >= k ? 1 : S.atLeast(S.poissonPmf(Math.max(lamRest, 0)), k - cur));
+  function liveMinute(L) { return D.isFinished(L) ? 90 : L.status === 'HT' ? 45 : Math.min(90, L.elapsed || 0); }
+  function viewLiveTeam(r) {
+    const m = state.match, L = m.live, f = r.fixture;
+    if (!L) return m.liveErr ? `<div class="error">${esc(m.liveErr)}</div>` : progressBlock('Loading live data');
+    if (!D.isLive(L) && !D.isFinished(L)) return `<div class="empty">Kick-off at ${fmtTime(f.ts)}. Live stats appear here once the match starts and update every minute.</div>`;
+    const min = liveMinute(L), rest = Math.max(0, 90 - min) / 90, done = D.isFinished(L);
+    const st = L.st || { h: {}, a: {} };
+    const row = (label, k, stat) => {
+      const h = st.h[k], a = st.a[k];
+      const t = stat && r.team[stat];
+      const exp = t ? `<td class="muted">${f1(t.lh)}–${f1(t.la)}</td>` : '<td></td>';
+      return `<tr><td class="l">${label}</td><td><b>${dash(h)}</b></td><td><b>${dash(a)}</b></td>${exp}</tr>`;
+    };
+    const table = `<div class="tbl-wrap"><table><thead><tr><th class="l"></th><th>${esc(f.home.name)}</th><th>${esc(f.away.name)}</th><th>Expected</th></tr></thead><tbody>
+      ${row('Shots', 'shots', 'shots')}${row('Shots on target', 'sot', 'sot')}${row('Corners', 'corners', 'corners')}${row('Fouls', 'fouls', 'fouls')}
+      ${row('Yellow cards', 'yellow')}${row('Red cards', 'red')}${row('Cards', 'cards', 'cards')}${row('Keeper saves', 'saves', 'saves')}${row('Possession %', 'poss')}${row('Offsides', 'offsides')}</tbody></table></div>`;
+    // in-play chances for the next lines, using the pre-match rates for the minutes left
+    let inplay = '';
+    if (!done && rest * 90 >= 3) {
+      const lines = [];
+      for (const [stat, word] of [['corners', 'corners'], ['cards', 'cards'], ['sot', 'shots on target']]) {
+        const t = r.team[stat], ch = st.h[stat] || 0, ca = st.a[stat] || 0, cur = ch + ca;
+        const J = S.summarise(S.jointFlex(t.lh * rest, t.la * rest, stat === 'goals' ? 0 : (FP.models.DEFAULTS.dispersion[stat] || {}).cm || 0, (FP.models.DEFAULTS.dispersion[stat] || {}).cc || 0));
+        for (let i = 0; i < 3; i++) {
+          const line = cur + i + 0.5, need = i + 1;
+          const p = S.atLeast(J.total, need);
+          lines.push(`<tr><td class="l">Over ${line} ${word}</td><td>${pct(p)}</td><td><span class="odds fair">${esc(frac(fairDec(p)))}</span></td><td>${addBtn({ id: `${f.id}:live:${stat}:${line}`, label: `Over ${line} ${word} (in play, ${min}')`, match: `${f.home.name} v ${f.away.name}`, fixtureId: f.id, kickoff: f.ts, p, group: 'In play', family: `live-${stat}-o`, level: line, odds: '' })}</td></tr>`);
+        }
+      }
+      inplay = `<div class="panel"><h3>In-play chances</h3><p class="small muted">What happens next, using each team's pre-match rates for the ${Math.round(rest * 90)} minutes left plus what has already happened.</p><div class="tbl-wrap"><table><thead><tr><th class="l">Line</th><th>Chance</th><th>Fair</th><th></th></tr></thead><tbody>${lines.join('')}</tbody></table></div></div>`;
+    }
+    const evs = (L.events || []).slice().sort((a, b) => (a.min || 0) - (b.min || 0) || (a.extra || 0) - (b.extra || 0));
+    const evRow = (e) => {
+      const side = e.team === f.home.id ? f.home.name : e.team === f.away.id ? f.away.name : '';
+      const t = e.min != null ? `${e.min}${e.extra ? '+' + e.extra : ''}'` : '';
+      let what;
+      if (e.type === 'Goal') what = `<b>Goal</b> ${esc(e.player || '')}${e.other && !/own/i.test(e.detail) ? ` <span class="muted">(${esc(e.other)})</span>` : ''}${/own/i.test(e.detail) ? ' <span class="muted">own goal</span>' : /pen/i.test(e.detail) ? ' <span class="muted">penalty</span>' : ''}`;
+      else if (e.type === 'Card') what = `<span class="${/red/i.test(e.detail) ? 'cardr' : 'cardy'}" aria-label="${esc(e.detail)}"></span> ${esc(e.player || '')}`;
+      else what = `<span class="muted">Sub</span> ${esc(e.player || '')} on${e.other ? ' for ' + esc(e.other) : ''}`;
+      return `<tr><td class="l">${t}</td><td class="l">${what}</td><td class="l muted">${esc(side)}</td></tr>`;
+    };
+    const timeline = evs.length ? `<div class="tbl-wrap"><table><tbody>${evs.map(evRow).join('')}</tbody></table></div>` : '<p class="small muted">No goals, cards or substitutions yet.</p>';
+    const stamp = m.liveAt ? `Updated ${fmtTime(m.liveAt)}${done ? '' : ', refreshes every minute'}.` : '';
+    return `<div class="panel"><div class="row"><h3 class="grow">${done ? 'Full time' : L.status === 'HT' ? 'Half time' : 'Live, ' + min + "'"}</h3><button class="chip" data-act="live-refresh">Refresh</button></div>
+      <p class="small muted">${stamp} Expected is the pre-match prediction for the whole match.</p>${table}</div>${inplay}<div class="panel"><h3>Goals, cards and substitutions</h3>${timeline}</div>`;
+  }
+  function viewLivePlayers(r) {
+    const m = state.match, L = m.live, f = r.fixture;
+    if (!L) return m.liveErr ? `<div class="error">${esc(m.liveErr)}</div>` : progressBlock('Loading live data');
+    if (!L.players) return `<div class="empty">Player stats appear here once the match starts.</div>`;
+    const side = m.liveSide, tid = side === 'home' ? f.home.id : f.away.id;
+    const seg = `<div class="seg" role="group"><button data-act="lside" data-v="home" aria-pressed="${side === 'home'}">${esc(f.home.name)}</button><button data-act="lside" data-v="away" aria-pressed="${side === 'away'}">${esc(f.away.name)}</button></div>`;
+    const done = D.isFinished(L), min = liveMinute(L);
+    const pre = new Map(r.players[side].map((p) => [p.id, p]));
+    const ps = L.players.filter((p) => p.team === tid && p.min > 0).sort((a, b) => (b.start - a.start) || ('GDMF'.indexOf(FP.players.normPos(a.pos)) - 'GDMF'.indexOf(FP.players.normPos(b.pos))));
+    const rows = ps.map((p) => {
+      const P = pre.get(p.id);
+      const left = !done && p.onPitch !== false ? Math.max(0, 90 - min) : 0;
+      const next = (k, word) => {
+        if (!P || !P.pred[k] || !P.pred[k].rate90) return '';
+        const cur = p[k] || 0, lam = P.pred[k].rate90 * (P.pred[k].factor || 1) * left / 90;
+        const out = [];
+        for (const want of [cur + 1, cur + 2]) { if (want > 4 || done) continue; const pr = remainP(cur, lam, want); out.push(`<span class="pchip ${pr >= 0.5 ? 'mid' : ''}">${word} ${want}+ ${pct(pr)} <span class="odds">${esc(frac(fairDec(pr)))}</span></span>`); }
+        return out.join('');
+      };
+      const gk = FP.players.normPos(p.pos) === 'G';
+      const card = p.rc ? '<span class="cardr" aria-label="red card"></span>' : p.yc ? '<span class="cardy" aria-label="yellow card"></span>' : '';
+      const stats = gk ? `<td colspan="4" class="l">${p.saves || 0} save${p.saves === 1 ? '' : 's'}</td>` : `<td>${p.fc || 0}</td><td>${p.fd || 0}</td><td>${p.shots || 0}</td><td>${p.sot || 0}${p.goals ? ` <span class="muted">(${p.goals}G)</span>` : ''}</td>`;
+      const chips = !done && left > 0 && !gk ? `<tr class="nob"><td colspan="6"><div class="pchips">${next('fc', 'Fouls')}${next('fd', 'Fouled')}${next('sot', 'On target')}</div></td></tr>` : '';
+      return `<tr><td class="l">${esc(p.name)} ${card}${p.onPitch === false && !done ? ' <span class="muted small">off</span>' : ''}</td><td>${p.min}'</td>${stats}</tr>${chips}`;
+    }).join('');
+    const hd = '<th class="l">Player</th><th>Min</th><th>Fouls</th><th>Fouled</th><th>Shots</th><th>On tgt</th>';
+    return seg + `<div class="panel"><p class="small muted">${done ? 'Final player stats.' : `Live player stats, ${min}'. Chances show what each player still needs, using his pre-match rate for the minutes left.`} G marks goals.</p>
+      <div class="tbl-wrap"><table class="live-pl"><thead><tr>${hd}</tr></thead><tbody>${rows || '<tr><td colspan="6" class="l">No players have appeared yet.</td></tr>'}</tbody></table></div></div>`;
   }
 
   /* ---------- match report ---------- */
@@ -3134,13 +3636,16 @@ window.TEAMSHEET_VERSION='202611211800';
     const m = state.match, f = r.fixture;
     const status = D.isFinished(f) ? `<span class="badge warn">Finished ${f.goals ? f.goals.h + '-' + f.goals.a : ''}</span>` : r.lineupStatus === 'confirmed' ? '<span class="badge ok">Confirmed team sheets</span>' : '<span class="badge warn">Predicted line-ups</span>';
     const exp = r.team.goals;
-    const head = `<section class="sheet-head"><div class="vs"><div class="side">${esc(f.home.name)}</div><div class="mid"><div class="big">${D.isFinished(f) && f.goals ? f.goals.h + '–' + f.goals.a : fmtTime(f.ts)}</div><div class="small">${f.hypothetical ? 'hypothetical' : esc(fmtShort(f.ts))}</div></div><div class="side away">${esc(f.away.name)}</div></div>
+    const head = `<section class="sheet-head"><div class="vs"><div class="side">${esc(f.home.name)}</div><div class="mid"><div class="big">${(() => { const L = m.live; if (L && L.goals && (D.isLive(L) || D.isFinished(L))) return L.goals.h + '–' + L.goals.a; return D.isFinished(f) && f.goals ? f.goals.h + '–' + f.goals.a : fmtTime(f.ts); })()}</div><div class="small">${f.hypothetical ? 'hypothetical' : m.live && D.isLive(m.live) ? (m.live.status === 'HT' ? 'Half time' : 'Live ' + (m.live.elapsed || '') + "'") : esc(fmtShort(f.ts))}</div></div><div class="side away">${esc(f.away.name)}</div></div>
       <div class="meta"><span>${esc(f.compName || '')}${f.round ? ', ' + esc(f.round) : ''}</span>${f.referee ? `<span>Referee ${esc(String(f.referee).split(',')[0])}</span>` : ''}<span>Expected goals ${f2(exp.lh)} to ${f2(exp.la)}</span></div>
       <div class="meta">${status}</div></section>`;
-    const tabs = [['picks', 'Picks'], ['match', 'Match'], ['players', 'Players'], ['form', 'Form'], ['h2h', 'Head to head'], ['notes', 'Notes']];
+    const liveTabs = hasLive(r) ? [['live', D.isFinished(f) || (m.live && D.isFinished(m.live)) ? 'Match stats' : 'Live stats'], ['liveplayers', D.isFinished(f) || (m.live && D.isFinished(m.live)) ? 'Player stats' : 'Live players']] : [];
+    const tabs = liveTabs.concat([['picks', 'Picks'], ['match', 'Match'], ['players', 'Players'], ['form', 'Form'], ['h2h', 'Head to head'], ['notes', 'Notes']]);
     const tabBar = `<div class="subtabs"><div class="chips" role="tablist">${tabs.map(([k, l]) => `<button class="chip" role="tab" data-act="rtab" data-v="${k}" aria-pressed="${m.tab === k}">${l}</button>`).join('')}</div></div>`;
     let body = '';
-    if (m.tab === 'picks') body = viewPicks(r.selections, r, false);
+    if (m.tab === 'live') body = viewLiveTeam(r);
+    else if (m.tab === 'liveplayers') body = viewLivePlayers(r);
+    else if (m.tab === 'picks') body = viewPicks(r.selections, r, false);
     else if (m.tab === 'match') body = viewMatchNumbers(r);
     else if (m.tab === 'players') body = viewPlayers(r);
     else if (m.tab === 'form') body = viewForm(r);
@@ -3150,11 +3655,11 @@ window.TEAMSHEET_VERSION='202611211800';
   }
 
   function pickRow(mk, threshold, long, showMatch) {
-    const odds = mk.price ? `<span>${esc(mk.price.toFixed(2))} ${esc(mk.priceBook)}</span>${mk.edge == null ? '' : `<span class="${mk.edge > 0 ? 'value' : 'novalue'}">${mk.edge > 0 ? 'Value +' + Math.round(mk.edge * 100) + '%' : 'Bookmaker implies ' + pct(mk.implied)}</span>`}` : '';
+    const odds = `<span>${priceText(mk)}</span>${mk.price && mk.edge != null ? `<span class="${mk.edge > 0 ? 'value' : 'novalue'}">${mk.edge > 0 ? 'Value +' + Math.round(mk.edge * 100) + '%' : 'Bookmaker implies ' + pct(mk.implied)}</span>` : ''}`;
     const res = mk.result === true ? '<span class="res-won">Won</span>' : mk.result === false ? '<span class="res-lost">Lost</span>' : '';
     const ctx = showMatch ? `<span>${esc(mk.match)}, ${fmtTime(mk.kickoff)}</span>` : '';
     const lu = mk.isPlayer && mk.lineup !== 'start' ? `<span>${mk.lineup === 'bench' ? 'on the bench' : 'line-up not confirmed'}</span>` : '';
-    return `<div class="pick"><div class="top-line"><div class="lbl">${esc(mk.label)}</div><div class="prob">${pct(mk.p)}</div></div>
+    return `<div class="pick"><div class="top-line"><div class="lbl">${esc(mk.label)}</div><div class="prob">${pct(mk.p)}</div>${addBtn(legOf(mk))}</div>
       <div class="sub">${ctx}<span>${esc(mk.group)}</span>${lu}${odds}${res}</div>${strip(mk.p, threshold, long)}</div>`;
   }
   function viewPicks(sel, r, multi) {
@@ -3188,15 +3693,28 @@ window.TEAMSHEET_VERSION='202611211800';
     return seg + (list === 'lucky' ? '' : sortSeg) + grpSeg + body;
   }
 
+  function cell(r, family, level, label, p) {
+    const m = findMarket(r, family, level);
+    const price = m && m.price ? `<span class="odds">${esc(frac(m.price))}</span>` : `<span class="odds fair">${esc(frac(fairDec(p)))}</span>`;
+    return `<td><span class="cellp">${pct(p)}</span> ${price} ${addBtn(adHocLeg(r, family, level, label, p))}</td>`;
+  }
   function lineTable(title, t, lines, opts) {
     opts = opts || {};
-    const rows = lines.map((l) => `<tr><td>Over ${l}</td><td>${pct(S.atLeast(t.total, Math.ceil(l)))}</td><td>${pct(1 - S.atLeast(t.total, Math.ceil(l)))}</td></tr>`).join('');
+    const r = opts.r, stat = opts.stat, word = opts.word || title.toLowerCase();
+    const rows = lines.map((l) => {
+      const po = S.atLeast(t.total, Math.ceil(l));
+      const fam = stat === 'goals' ? 'g-tot' : stat + '-tot';
+      return r ? `<tr><td>${l}</td>${cell(r, fam + '-o', l, `Over ${l} ${word}`, po)}${cell(r, fam + '-u', -l, `Under ${l} ${word}`, 1 - po)}</tr>` : `<tr><td>Over ${l}</td><td>${pct(po)}</td><td>${pct(1 - po)}</td></tr>`;
+    }).join('');
     return `<div class="panel"><h3>${esc(title)}</h3><p class="small muted">Expected ${f1(t.lh)} for the home side, ${f1(t.la)} for the away side, ${f1(t.lh + t.la)} in total.</p>
+      <p class="small muted">Odds in grey are fair odds from the model's chance; odds in black are bookmaker prices. Tap + to add a line to the bet builder.</p>
       <div class="tbl-wrap"><table><thead><tr><th class="l">Line</th><th>Over</th><th>Under</th></tr></thead><tbody>${rows}</tbody></table></div>${opts.extra || ''}</div>`;
   }
   function teamLines(r, stat, lines, word) {
     const t = r.team[stat], f = r.fixture;
-    const rows = lines.map((l) => `<tr><td>${l}+</td><td>${pct(S.atLeast(t.home, l))}</td><td>${pct(S.atLeast(t.away, l))}</td><td>${pct(S.bothAtLeast(t.joint, l))}</td></tr>`).join('');
+    const fam = stat === 'goals' ? 'g' : stat;
+    const w = word.toLowerCase().replace(/^team |^saves by keeper$/, (x) => (x === 'saves by keeper' ? 'keeper saves' : ''));
+    const rows = lines.map((l) => `<tr><td>${l}+</td>${cell(r, `${fam}-H-o`, l - 0.5, `${f.home.name} ${l}+ ${w}`, S.atLeast(t.home, l))}${cell(r, `${fam}-A-o`, l - 0.5, `${f.away.name} ${l}+ ${w}`, S.atLeast(t.away, l))}${cell(r, `${stat}-both`, l, `Both teams ${l}+ ${w}`, S.bothAtLeast(t.joint, l))}</tr>`).join('');
     return `<div class="tbl-wrap"><table><thead><tr><th class="l">${esc(word)}</th><th>${esc(f.home.name)}</th><th>${esc(f.away.name)}</th><th>Both</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function viewMatchNumbers(r) {
@@ -3204,7 +3722,15 @@ window.TEAMSHEET_VERSION='202611211800';
     const x = g.oneXtwo;
     const bar = `<div class="bar1x2" role="img" aria-label="Home ${pct(x.h)}, draw ${pct(x.d)}, away ${pct(x.a)}"><div class="h" style="width:${x.h * 100}%">${pct(x.h)}</div><div class="d" style="width:${x.d * 100}%">${pct(x.d)}</div><div class="a" style="width:${x.a * 100}%">${pct(x.a)}</div></div>`;
     const res = `<div class="panel"><h3>Result</h3><div class="row small muted" style="margin:6px 0"><span class="grow">${esc(f.home.name)}</span><span>Draw</span><span class="grow" style="text-align:right">${esc(f.away.name)}</span></div>${bar}
-      <div class="hits" style="margin-top:12px"><span class="hit">Both teams score <b>${pct(g.btts)}</b></span><span class="hit">${esc(f.home.name)} or draw <b>${pct(x.h + x.d)}</b></span><span class="hit">${esc(f.away.name)} or draw <b>${pct(x.a + x.d)}</b></span>
+      <div class="tbl-wrap" style="margin-top:12px"><table><tbody>
+        <tr><td>${esc(f.home.name)} to win</td>${cell(r, 'res-H', 0, `${f.home.name} to win`, x.h)}</tr>
+        <tr><td>Draw</td>${cell(r, 'res-D', 0, 'Draw', x.d)}</tr>
+        <tr><td>${esc(f.away.name)} to win</td>${cell(r, 'res-A', 0, `${f.away.name} to win`, x.a)}</tr>
+        <tr><td>${esc(f.home.name)} or draw</td>${cell(r, 'dc-1X', 0, `${f.home.name} or draw (double chance)`, x.h + x.d)}</tr>
+        <tr><td>${esc(f.away.name)} or draw</td>${cell(r, 'dc-X2', 0, `${f.away.name} or draw (double chance)`, x.a + x.d)}</tr>
+        <tr><td>Both teams to score</td>${cell(r, 'btts-y', 0, 'Both teams to score', g.btts)}</tr>
+        <tr><td>Both teams to score: No</td>${cell(r, 'btts-n', 0, 'Both teams to score: No', 1 - g.btts)}</tr></tbody></table></div>
+      <div class="hits" style="margin-top:12px">
       ${g.topScores.slice(0, 4).map((s) => `<span class="hit">Score ${s.s} <b>${pct(s.p)}</b></span>`).join('')}</div></div>`;
     const fac = r.factors;
     const facLine = (st, word) => {
@@ -3213,13 +3739,13 @@ window.TEAMSHEET_VERSION='202611211800';
       if (fac[st].h2h) a.push(`head to head ${fac[st].h2h.factor >= 1 ? '+' : ''}${Math.round((fac[st].h2h.factor - 1) * 100)}% from ${fac[st].h2h.n} meetings`);
       return a.length ? `<p class="small muted">${esc(word)} adjusted for ${a.join(' and ')}.</p>` : '';
     };
-    return res + lineTable('Goals', g, [0.5, 1.5, 2.5, 3.5, 4.5], { extra: teamLines(r, 'goals', [1, 2, 3], 'Team goals') })
-      + lineTable('Corners', r.team.corners, [7.5, 8.5, 9.5, 10.5, 11.5, 12.5], { extra: teamLines(r, 'corners', [3, 4, 5, 6, 7], 'Team corners') + facLine('corners', 'Corners') })
-      + lineTable('Cards', r.team.cards, [1.5, 2.5, 3.5, 4.5, 5.5, 6.5], { extra: teamLines(r, 'cards', [1, 2, 3, 4], 'Team cards') + facLine('cards', 'Cards') + '<p class="small muted">Cards count yellows plus reds as recorded by API-Football. Bookmakers settle card markets in different ways, so check their rules.</p>' })
-      + lineTable('Goalkeeper saves', r.team.saves, [3.5, 4.5, 5.5, 6.5, 7.5], { extra: teamLines(r, 'saves', [1, 2, 3, 4, 5], 'Saves by keeper') })
-      + lineTable('Shots on target', r.team.sot, [5.5, 6.5, 7.5, 8.5, 9.5, 10.5], { extra: teamLines(r, 'sot', [2, 3, 4, 5, 6], 'Team shots on target') })
-      + lineTable('Shots', r.team.shots, [18.5, 20.5, 22.5, 24.5, 26.5], { extra: teamLines(r, 'shots', [8, 10, 12, 14], 'Team shots') })
-      + lineTable('Fouls', r.team.fouls, [18.5, 20.5, 22.5, 24.5, 26.5], { extra: teamLines(r, 'fouls', [8, 10, 12, 14], 'Team fouls') + facLine('fouls', 'Fouls') });
+    return res + lineTable('Goals', g, [0.5, 1.5, 2.5, 3.5, 4.5], { r, stat: 'goals', word: 'goals', extra: teamLines(r, 'goals', [1, 2, 3], 'Team goals') })
+      + lineTable('Corners', r.team.corners, [7.5, 8.5, 9.5, 10.5, 11.5, 12.5], { r, stat: 'corners', word: 'corners', extra: teamLines(r, 'corners', [3, 4, 5, 6, 7], 'Team corners') + facLine('corners', 'Corners') })
+      + lineTable('Cards', r.team.cards, [1.5, 2.5, 3.5, 4.5, 5.5, 6.5], { r, stat: 'cards', word: 'cards', extra: teamLines(r, 'cards', [1, 2, 3, 4], 'Team cards') + facLine('cards', 'Cards') + '<p class="small muted">Cards count yellows plus reds as recorded by the data source. Bookmakers settle card markets in different ways, so check their rules.</p>' })
+      + lineTable('Goalkeeper saves', r.team.saves, [3.5, 4.5, 5.5, 6.5, 7.5], { r, stat: 'saves', word: 'keeper saves', extra: teamLines(r, 'saves', [1, 2, 3, 4, 5], 'Saves by keeper') })
+      + lineTable('Shots on target', r.team.sot, [5.5, 6.5, 7.5, 8.5, 9.5, 10.5], { r, stat: 'sot', word: 'shots on target', extra: teamLines(r, 'sot', [2, 3, 4, 5, 6], 'Team shots on target') })
+      + lineTable('Shots', r.team.shots, [18.5, 20.5, 22.5, 24.5, 26.5], { r, stat: 'shots', word: 'shots', extra: teamLines(r, 'shots', [8, 10, 12, 14], 'Team shots') })
+      + lineTable('Fouls', r.team.fouls, [18.5, 20.5, 22.5, 24.5, 26.5], { r, stat: 'fouls', word: 'fouls', extra: teamLines(r, 'fouls', [8, 10, 12, 14], 'Team fouls') + facLine('fouls', 'Fouls') });
   }
 
   function statusLabel(p) {
@@ -3229,18 +3755,29 @@ window.TEAMSHEET_VERSION='202611211800';
     if (p.status === 'doubt') return `<span class="st doubt">Doubtful${p.injury ? ': ' + esc(p.injury.reason) : ''}, plays ${pct(p.pPlay)}</span>`;
     return `<span class="st predicted">Likely to start ${pct(p.pStart)}, plays ${pct(p.pPlay)}</span>`;
   }
-  function pchip(label, p) { const c = p >= 0.75 ? 'hi' : p >= 0.5 ? 'mid' : ''; return `<span class="pchip ${c}">${label} ${pct(p)}</span>`; }
+  function pchip(label, p, leg) {
+    const c = p >= 0.75 ? 'hi' : p >= 0.5 ? 'mid' : '';
+    if (!leg) return `<span class="pchip ${c}">${label} ${pct(p)}</span>`;
+    const k = 'a' + (++addSeq); addReg.set(k, leg);
+    const on = state.slip.some((x) => x.id === leg.id);
+    return `<button class="pchip ${c}${on ? ' sel' : ''}" data-act="add" data-k="${k}" aria-pressed="${on}">${label} ${pct(p)} <span class="odds">${esc(leg.price ? frac(leg.price) : frac(fairDec(p)))}</span></button>`;
+  }
   function viewPlayers(r) {
     const m = state.match, f = r.fixture, side = m.side;
     const seg = `<div class="seg" role="group"><button data-act="side" data-v="home" aria-pressed="${side === 'home'}">${esc(f.home.name)}</button><button data-act="side" data-v="away" aria-pressed="${side === 'away'}">${esc(f.away.name)}</button></div>`;
     const sq = r.squads[side];
-    const head = sq.confirmed ? `<p class="small muted">Confirmed team sheet${sq.formation ? ', ' + esc(sq.formation) : ''}. Only these players are used.</p>` : '<p class="small muted">Predicted from recent line-ups and injury news. Tap a player for his last 10 matches.</p>';
+    const head = (sq.confirmed ? `<p class="small muted">Confirmed team sheet${sq.formation ? ', ' + esc(sq.formation) : ''}. Only these players are used.</p>` : '<p class="small muted">Predicted from recent line-ups. Tap a player\'s name for his last 10 matches.</p>') + '<p class="small muted">Each chance shows fair odds as a fraction. Tap a chance to add it to the bet builder.</p>';
     const rows = r.players[side].map((p) => {
       const P = p.pred, open = m.open.has(p.id);
+      const who = `${p.name} (${side === 'home' ? f.home.name : f.away.name})`;
+      const L = (fam, lv, txt, pr) => adHocLeg(r, `p-${fam}-${p.id}`, lv, `${who}: ${txt}`, pr);
       const chips = p.pos === 'G'
-        ? (P.saves ? pchip('Saves 2+', P.saves.p2) + pchip('3+', P.saves.p3) + pchip('4+', P.saves.p4) : '') + pchip('Card', P.card.p)
-        : pchip('Fouls 1+', P.fc.p1) + pchip('2+', P.fc.p2) + pchip('Fouled 1+', P.fd.p1) + pchip('2+', P.fd.p2) + pchip('Shots 1+', P.shots.p1) + pchip('2+', P.shots.p2) + pchip('On target 1+', P.sot.p1) + pchip('Card', P.card.p) + pchip('Scores', P.goals.p1);
-      return `<div class="pl"><button data-act="ptoggle" data-id="${p.id}" aria-expanded="${open}"><div><span class="pos">${esc(p.pos)}</span><span class="name">${esc(p.name)}</span> ${statusLabel(p)}</div>${p.status === 'out' ? '' : `<div class="pchips">${chips}</div>`}</button>${open ? `<div class="more">${playerDetail(p)}</div>` : ''}</div>`;
+        ? (P.saves ? pchip('Saves 2+', P.saves.p2, L('saves', 2, '2+ saves', P.saves.p2)) + pchip('3+', P.saves.p3, L('saves', 3, '3+ saves', P.saves.p3)) + pchip('4+', P.saves.p4, L('saves', 4, '4+ saves', P.saves.p4)) : '') + pchip('Card', P.card.p, L('card', 1, 'to be carded', P.card.p))
+        : pchip('Fouls 1+', P.fc.p1, L('fc', 1, '1+ fouls committed', P.fc.p1)) + pchip('2+', P.fc.p2, L('fc', 2, '2+ fouls committed', P.fc.p2)) + pchip('3+', P.fc.p3, L('fc', 3, '3+ fouls committed', P.fc.p3))
+          + pchip('Fouled 1+', P.fd.p1, L('fd', 1, 'fouled 1+ times', P.fd.p1)) + pchip('2+', P.fd.p2, L('fd', 2, 'fouled 2+ times', P.fd.p2))
+          + pchip('Shots 1+', P.shots.p1, L('shots', 1, '1+ shots', P.shots.p1)) + pchip('2+', P.shots.p2, L('shots', 2, '2+ shots', P.shots.p2))
+          + pchip('On target 1+', P.sot.p1, L('sot', 1, '1+ shots on target', P.sot.p1)) + pchip('Card', P.card.p, L('card', 1, 'to be carded', P.card.p)) + pchip('Scores', P.goals.p1, L('goal', 1, 'to score', P.goals.p1));
+      return `<div class="pl"><button data-act="ptoggle" data-id="${p.id}" aria-expanded="${open}"><div><span class="pos">${esc(p.pos)}</span><span class="name">${esc(p.name)}</span> ${statusLabel(p)}</div></button>${p.status === 'out' ? '' : `<div class="pchips">${chips}</div>`}${open ? `<div class="more">${playerDetail(p)}</div>` : ''}</div>`;
     }).join('');
     return seg + `<div class="panel">${head}${rows || '<div class="empty">No players found.</div>'}</div>`;
   }
@@ -3251,7 +3788,8 @@ window.TEAMSHEET_VERSION='202611211800';
     const hd = gk ? '<th>Saves</th>' : '<th>Fouls</th><th>Fouled</th><th>Shots</th><th>On tgt</th><th>Goals</th>';
     const hit = (k, word) => (L.hits[k] || []).map((h) => `<span class="hit">${word} ${h.l}+ <b>${h.c}/${h.t}</b></span>`).join('');
     const exp = gk ? `Expected saves ${f1(P.saves && P.saves.mean)}` : `Expected: ${f1(P.fc.mean)} fouls, fouled ${f1(P.fd.mean)} times, ${f1(P.shots.mean)} shots, ${f1(P.sot.mean)} on target`;
-    const fac = !gk ? `<p class="small muted">Matchup effect: fouls ${Math.round(P.fc.factor * 100)}%, fouled ${Math.round(P.fd.factor * 100)}%, shots ${Math.round(P.shots.factor * 100)}% of his usual level. Expected minutes ${Math.round(p.expMin)}.</p>` : '';
+    const mu = p.matchup ? `<p class="small">Direct opponent: <b>${esc(p.matchup.opponent)}</b>, who is fouled ${Math.round(Math.abs(p.matchup.oppFd - 1) * 100)}% ${p.matchup.oppFd >= 1 ? 'more' : 'less'} than average for his position and commits ${Math.round(Math.abs(p.matchup.oppFc - 1) * 100)}% ${p.matchup.oppFc >= 1 ? 'more' : 'fewer'} fouls.</p>` : '';
+    const fac = !gk ? `${mu}<p class="small muted">Matchup effect: fouls ${Math.round(P.fc.factor * 100)}%, fouled ${Math.round(P.fd.factor * 100)}%, shots ${Math.round(P.shots.factor * 100)}% of his usual level. Expected minutes ${Math.round(p.expMin)}.</p>` : '';
     return `<div class="tbl-wrap"><table><thead><tr><th class="l">Date</th><th class="l">Opponent</th><th>Min</th>${hd}<th>Card</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="l">No recent matches in the data.</td></tr>'}</tbody></table></div>
       <div class="hits">${gk ? hit('saves', 'Saves') : hit('fc', 'Fouls') + hit('fd', 'Fouled') + hit('shots', 'Shots') + hit('sot', 'On target')}${hit('card', 'Card')}</div>
       <p class="small">${exp}. Card ${pct(P.card.p)}.</p>${fac}`;
@@ -3432,6 +3970,82 @@ window.TEAMSHEET_VERSION='202611211800';
     return drop.length;
   }
 
+
+  /* ---------- bet tracker ---------- */
+  const pctPlain = (p) => (p == null || !isFinite(p) ? '–' : Math.round(p * 100) + '%');
+  const money = (x) => (x == null || !isFinite(x) ? '–' : (x < 0 ? '-£' : '£') + Math.abs(x).toFixed(2));
+  function saveBets() { if (!FP.tracker.save(state.bets)) toast('Could not save: browser storage is full or blocked'); }
+  function periodStart(k) {
+    const now = new Date();
+    if (k === 'month') return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    if (k === 'week') return Date.now() - 7 * 86400000;
+    return 0;
+  }
+  let settling = false;
+  async function autoSettle() {
+    if (settling) return;
+    const src = state.settings.source;
+    const mine = state.bets.filter((b) => (b.source || 'espn') === src);
+    const ids = FP.tracker.pendingFixtures(mine, Date.now()).slice(0, 30);
+    if (!ids.length) return;
+    settling = true; state.betsUi.busy = true; if (state.view === 'bets') render();
+    const map = new Map();
+    try {
+      const e = await getEngine();
+      for (const id of ids) { try { map.set(id, await e.liveUpdate(id)); } catch (err) { /* try again next time */ } }
+      const n = FP.tracker.applyResults(mine, map);
+      if (n) { saveBets(); state.betsUi.msg = 'Results updated'; }
+    } catch (err) { state.betsUi.msg = friendlyError(err); }
+    settling = false; state.betsUi.busy = false;
+    if (state.view === 'bets' && !state.slipOpen) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  }
+  const STATUS = { open: 'Open', won: 'Won', lost: 'Lost', void: 'Void', check: 'Check: a leg was void' };
+  function betCard(b) {
+    const ui = state.betsUi;
+    const pAll = b.legs.reduce((a, l) => a * l.p, 1);
+    const legs = b.legs.map((l) => {
+      const ic = l.result === true ? '<span class="res-won">✓</span>' : l.result === false ? '<span class="res-lost">✗</span>' : l.result === 'void' ? '<span class="muted">void</span>' : '<span class="muted">…</span>';
+      return `<div class="betleg">${ic} <span class="grow">${esc(l.label)}<br><span class="small muted">${esc(l.match)}${l.kickoff ? ', ' + fmtShort(l.kickoff) : ''}, model ${pct(l.p)}${l.odds ? ', ' + esc(frac(l.odds)) : ''}</span></span></div>`;
+    }).join('');
+    const ret = b.status === 'open' ? `Returns ${money(b.stake * b.odds)} if it wins` : b.status === 'check' ? 'A leg was void; check the return with your bookmaker and mark it below' : `Returned ${money(b.returns)} (${b.returns - b.stake >= 0 ? '+' : ''}${money(b.returns - b.stake)})`;
+    const arm = (v, label) => `<button class="chip" data-act="bet-mark" data-id="${b.id}" data-v="${v}">${ui.armed === b.id + v ? 'Tap again' : label}</button>`;
+    return `<div class="panel bet ${b.status}"><div class="row"><span class="badge ${b.status === 'won' ? 'ok' : b.status === 'lost' ? 'bad' : 'warn'}">${STATUS[b.status] || b.status}${b.manual ? ' (set by you)' : ''}</span><span class="grow small muted">${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: TZ }).format(b.placedAt)}${b.book ? ', ' + esc(b.book) : ''}</span></div>
+      <div class="row" style="margin:8px 0"><span class="grow"><b>${money(b.stake)}</b> at <b>${esc(frac(b.odds))}</b> (${b.odds.toFixed(2)})</span><span class="small muted">Model ${pct(pAll)}, value ${b.odds * pAll - 1 >= 0 ? '+' : ''}${Math.round((b.odds * pAll - 1) * 100)}%</span></div>
+      ${legs}<p class="small">${ret}</p>
+      <div class="chips" style="flex-wrap:wrap">${arm('won', 'Mark won')}${arm('lost', 'Mark lost')}${arm('void', 'Mark void')}${b.manual ? arm('auto', 'Settle automatically') : ''}${arm('delete', 'Delete')}</div></div>`;
+  }
+  function viewBets() {
+    const ui = state.betsUi, T = FP.tracker;
+    const since = periodStart(ui.period);
+    const bets = state.bets;
+    const s = T.summary(bets, since), c = T.calibration(bets, since);
+    const per = [['all', 'All time'], ['month', 'This month'], ['week', 'Last 7 days']].map(([k, l]) => `<button class="chip" data-act="bets-period" data-v="${k}" aria-pressed="${ui.period === k}">${l}</button>`).join('');
+    if (!bets.length) return `<div class="panel"><h2>Your bets</h2><p>No bets logged yet.</p><p class="small muted">Add selections to the bet builder, open it, and use <b>Log this bet</b> once you have placed it with your bookmaker. The app settles each bet from the result and tracks your profit and loss, and how often the model's chances come in.</p></div>${backupPanel()}`;
+    const head = `<div class="panel"><h2>Your bets</h2><div class="chips">${per}</div>
+      <div class="kpis"><div><span class="small muted">Profit</span><b class="${s.profit >= 0 ? 'value' : 'res-lost'}">${money(s.profit)}</b></div><div><span class="small muted">Return on stakes</span><b>${s.roi == null ? '–' : (s.roi >= 0 ? '+' : '') + Math.round(s.roi * 100) + '%'}</b></div><div><span class="small muted">Won</span><b>${s.won} of ${s.won + s.lost}</b></div></div>
+      <p class="small muted">Settled: ${money(s.staked)} staked, ${money(s.returned)} returned${s.void ? `, ${s.void} void` : ''}. Open: ${s.open} bet${s.open === 1 ? '' : 's'}, ${money(s.openStake)} staked.${ui.busy ? ' Checking results…' : ''}</p>
+      <button class="chip" data-act="bets-refresh" ${ui.busy ? 'disabled' : ''}>Check results now</button></div>`;
+    const cal = c.n ? `<div class="panel"><h3>How the model's chances held up</h3><p class="small muted">Every settled selection you bet on, grouped by the chance the app gave it. If the model is right, the two columns should be close once you have plenty of bets.</p>
+      <div class="tbl-wrap"><table><thead><tr><th class="l">Model chance</th><th>Selections</th><th>Expected to win</th><th>Won</th></tr></thead><tbody>
+      ${c.bands.map((b) => `<tr><td class="l">${b.lo === 0 ? 'Under 50%' : Math.round(b.lo * 100) + '% to ' + Math.min(100, Math.round(b.hi * 100)) + '%'}</td><td>${b.n}</td><td>${pctPlain(b.p / b.n)}</td><td><b>${pctPlain(b.won / b.n)}</b></td></tr>`).join('')}
+      <tr><td class="l"><b>All</b></td><td><b>${c.n}</b></td><td><b>${pctPlain(c.expected)}</b></td><td><b>${pctPlain(c.actual)}</b></td></tr></tbody></table></div>
+      ${c.groups.length > 1 ? `<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th class="l">Market</th><th>Selections</th><th>Expected</th><th>Won</th></tr></thead><tbody>${c.groups.map((g) => `<tr><td class="l">${esc(g.g)}</td><td>${g.n}</td><td>${pctPlain(g.p / g.n)}</td><td>${pctPlain(g.won / g.n)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${c.avgValue != null ? `<p class="small muted">Average value at the odds you took: ${c.avgValue >= 0 ? '+' : ''}${Math.round(c.avgValue * 100)}% per selection.</p>` : ''}
+      ${c.n < 50 ? '<p class="small muted">Fewer than 50 settled selections: too few to judge the model yet.</p>' : ''}</div>` : '';
+    const inP = bets.filter((b) => b.placedAt >= since);
+    const open = inP.filter((b) => b.status === 'open' || b.status === 'check');
+    const done = inP.filter((b) => !(b.status === 'open' || b.status === 'check'));
+    const list = (open.length ? `<h3 style="margin:14px 2px 8px">Open bets</h3>${open.map(betCard).join('')}` : '')
+      + (done.length ? `<h3 style="margin:14px 2px 8px">Settled bets</h3>${done.slice(0, ui.show).map(betCard).join('')}${done.length > ui.show ? `<button class="btn secondary wide" data-act="bets-more">Show more</button>` : ''}` : '');
+    return head + cal + list + backupPanel();
+  }
+  function backupPanel() {
+    return `<div class="panel"><h3>Backup</h3><p class="small muted">Bets are kept only in this browser on this phone. Clearing saved match data does not touch them, but clearing Chrome's site data does, so take a backup now and then.</p>
+      <div class="row" style="flex-wrap:wrap"><button class="btn secondary" data-act="bets-backup">Copy backup</button><button class="btn secondary" data-act="bets-csv">Download spreadsheet (CSV)</button></div>
+      <label class="field" for="restore">Restore from a backup</label><textarea id="restore" rows="3" placeholder="Paste a backup here" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:8px"></textarea>
+      <button class="btn secondary" data-act="bets-restore" style="margin-top:8px">Restore</button></div>`;
+  }
+
   /* ---------- picks copy ---------- */
   function picksText(sel, which, multi) {
     const arr = which === 'best' ? sel.best : which === 'long' ? sel.longshots : sel.lucky ? sel.lucky.legs : [];
@@ -3451,8 +4065,71 @@ window.TEAMSHEET_VERSION='202611211800';
       case 'mode': m.mode = v; m.error = null; render(); break;
       case 'analyse': state.view = 'match'; runAnalysis((e, p) => e.analyseFixture(+id, p)); break;
       case 'analyse-teams': runAnalysis((e, p) => e.analyseTeams(m.league, +m.home, +m.away, p)); break;
-      case 'back': m.report = null; render(); break;
-      case 'rtab': m.tab = v; render(); break;
+      case 'back': clearTimeout(liveTimer); m.report = null; m.live = null; render(); if (m.list && m.list.some((x) => D.isLive(x))) { m.list = null; render(); } break;
+      case 'rtab': m.tab = v; render(); if ((v === 'live' || v === 'liveplayers') && (!m.live || Date.now() - (m.liveAt || 0) > 55000)) refreshLive(); break;
+      case 'lside': m.liveSide = v; render(); break;
+      case 'live-refresh': refreshLive(); break;
+      case 'add': { const leg = addReg.get(b.dataset.k); if (!leg) break; const added = toggleLeg(leg); toast(added ? 'Added to bet builder' : 'Removed from bet builder'); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
+      case 'log-bet': {
+        const stake = parseFloat(($('#log-stake') || {}).value);
+        const odds = parseOdds(($('#log-odds') || {}).value);
+        const book = (($('#log-book') || {}).value || '').trim();
+        const keep = !!($('#log-keep') || {}).checked;
+        if (!(stake > 0)) { toast('Enter your stake'); break; }
+        if (!odds) { toast('Enter the odds you got, for example 9/2'); break; }
+        const bet = FP.tracker.createBet(state.slip, stake, odds, book, parseOdds);
+        bet.source = state.settings.source;
+        state.bets.unshift(bet); saveBets();
+        if (book) { state.settings.lastBook = book; saveSettings(); }
+        state.betsUi.keep = keep;
+        if (!keep) { state.slip = []; saveSlip(); }
+        state.slipOpen = false; toast('Bet logged'); location.hash = 'bets'; render();
+        break;
+      }
+      case 'bets-period': state.betsUi.period = v; render(); break;
+      case 'bets-more': state.betsUi.show += 20; render(); break;
+      case 'bets-refresh': autoSettle(); break;
+      case 'bet-mark': {
+        const key = id + v, ui = state.betsUi;
+        if (ui.armed !== key) { ui.armed = key; render(); setTimeout(() => { if (ui.armed === key) { ui.armed = null; if (state.view === 'bets') render(); } }, 4000); break; }
+        ui.armed = null;
+        const i = state.bets.findIndex((x) => x.id === id);
+        if (i < 0) break;
+        if (v === 'delete') state.bets.splice(i, 1); else FP.tracker.setManual(state.bets[i], v);
+        saveBets(); if (v === 'auto') autoSettle();
+        const y = window.scrollY; render(); window.scrollTo(0, y);
+        break;
+      }
+      case 'bets-backup': {
+        try { await navigator.clipboard.writeText(JSON.stringify({ app: 'teamsheet', saved: new Date().toISOString(), bets: state.bets })); toast('Backup copied. Paste it somewhere safe, such as a note or an email to yourself'); } catch (e) { toast('Copying is blocked here'); }
+        break;
+      }
+      case 'bets-csv': {
+        const csv = FP.tracker.toCSV(state.bets);
+        if (IN_CLAUDE) { try { await navigator.clipboard.writeText(csv); toast('Downloads are blocked in this preview; spreadsheet copied instead'); } catch (e) { toast('Download is blocked here'); } break; }
+        try {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+          a.download = 'teamsheet-bets.csv'; document.body.appendChild(a); a.click(); a.remove();
+          toast('Spreadsheet downloaded');
+        } catch (e) { try { await navigator.clipboard.writeText(csv); toast('Download blocked; spreadsheet copied instead'); } catch (e2) { toast('Download is blocked here'); } }
+        break;
+      }
+      case 'bets-restore': {
+        const txt = ($('#restore') || {}).value || '';
+        try { const n = FP.tracker.importJSON(txt, state.bets); saveBets(); toast(n ? `Restored ${n} bet${n === 1 ? '' : 's'}` : 'Nothing new in that backup'); render(); } catch (e) { toast(e.message.includes('Teamsheet') ? e.message : 'That backup could not be read'); }
+        break;
+      }
+      case 'slip-open': state.slipOpen = true; render(); window.scrollTo(0, 0); break;
+      case 'slip-close': state.slipOpen = false; render(); break;
+      case 'slip-remove': state.slip.splice(+b.dataset.i, 1); saveSlip(); render(); break;
+      case 'slip-clear': state.slip = []; saveSlip(); render(); break;
+      case 'slip-copy': {
+        const t = slipTotals();
+        const txt = state.slip.map((l) => `${l.label} (${l.match}) ${pct(l.p)}${l.odds ? ' @ ' + l.odds : ''}`).join('\n') + `\nAll legs: ${pct(t.p)}, fair odds ${frac(t.fairDec)}${t.dec ? ', your odds ' + frac(t.dec) : ''}`;
+        try { await navigator.clipboard.writeText(txt); toast('Copied'); } catch (e) { toast('Copying is blocked here'); }
+        break;
+      }
       case 'plist': m.pickList = v; render(); break;
       case 'dtab': d.tab = v; render(); break;
       case 'dgroup': d.group = v; render(); break;
@@ -3508,6 +4185,7 @@ window.TEAMSHEET_VERSION='202611211800';
     const el = ev.target, bind = el.dataset && el.dataset.bind;
     if (!bind) return;
     const s = state.settings;
+    if (bind === 'legOdds') { const l = state.slip[+el.dataset.i]; if (l) { l.odds = el.value.trim(); saveSlip(); render(); } return; }
     if (bind === 'home' || bind === 'away') { state.match[bind] = el.value; render(); return; }
     if (bind === 'date') { state.day.date = el.value; return; }
     if (bind === 'leagueToggle') { const id = +el.value; if (el.checked) { if (!s.leagues.includes(id)) s.leagues.push(id); } else s.leagues = s.leagues.filter((x) => x !== id); state.day.leagues = null; saveSettings(); return; }
@@ -3533,12 +4211,27 @@ window.TEAMSHEET_VERSION='202611211800';
   }
   function route() {
     const h = (location.hash || '#match').slice(1);
-    state.view = ['match', 'day', 'settings'].includes(h) ? h : 'match';
+    state.view = ['match', 'day', 'bets', 'settings'].includes(h) ? h : 'match';
+    if (state.view === 'bets') setTimeout(autoSettle, 0);
+    state.slipOpen = false;
     if (state.view === 'settings') storageState.info = null;
     render();
   }
 
+  let listTimer = null;
+  function scheduleListRefresh() {
+    clearTimeout(listTimer);
+    listTimer = setTimeout(() => {
+      const m = state.match;
+      if (state.view === 'match' && !m.report && !state.slipOpen && m.mode === 'fixtures' && m.list && m.list.some((x) => D.isLive(x) || (x.status === 'NS' && x.ts < Date.now()))) loadFixtures();
+      scheduleListRefresh();
+    }, 60000);
+  }
   function start() {
+    state.slip = loadSlip();
+    state.bets = FP.tracker.load();
+    setTimeout(autoSettle, 5000);
+    scheduleListRefresh();
     document.addEventListener('click', onClick);
     document.addEventListener('change', onChange);
     document.addEventListener('input', onInput);

@@ -195,12 +195,66 @@ table.live-pl td:first-child { white-space: normal; min-width: 120px; }
 .kpis b { font-family: var(--display); font-size: 1.4rem; }
 .betleg { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); }
 .bet.won { border-left: 4px solid var(--pitch); } .bet.lost { border-left: 4px solid var(--red); } .bet.open, .bet.check { border-left: 4px solid var(--yellow); }
+
+/* accumulators */
+.acca-leg.freeze { background: var(--yellow-2); margin: 6px -14px; padding: 12px 14px; border-radius: 6px; }
+nav.tabs a { font-size: 0.98rem; }
+
+/* bet builder generator */
+nav.tabs a { font-size: 0.9rem; }
+.bbfx { text-align: left; }
+.bbfx.on { border-color: var(--pitch); background: var(--pitch-2); }
+.bbfx:disabled { opacity: 0.55; }
+.bbfx .tick { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--pitch); display: grid; place-items: center; color: #fff; font-weight: 700; }
+.bbfx.on .tick { background: var(--pitch); }
+.bb-tray { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip.bb-picked { background: var(--ink); border-color: var(--ink); color: #fff; white-space: normal; text-align: left; }
+.chip.bb-more { border-color: var(--pitch); color: var(--pitch); font-weight: 600; }
+.bb-switch { display: flex; gap: 8px; margin: 4px 0 10px; }
+.bb-switch button { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; background: var(--sheet); border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 12px; text-align: left; }
+.bb-switch button[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.bb-switch .n { font-family: var(--display); font-weight: 700; font-size: 1.08rem; }
+.bb-switch .s { font-size: 0.82rem; opacity: 0.85; }
+.ticket { background: var(--sheet); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 12px; }
+.tk-head { background: var(--ink); color: #fff; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 16px; }
+.tk-name { font-family: var(--display); font-weight: 700; font-size: 1.45rem; line-height: 1.1; }
+.tk-sub { font-size: 0.82rem; opacity: 0.85; }
+.tk-odds { text-align: right; }
+.tk-odds .big { font-family: var(--display); font-weight: 700; font-size: 2.6rem; line-height: 1; color: var(--yellow); }
+.tk-odds .small { opacity: 0.9; }
+.tk-match { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--paper); border-top: 1px solid var(--line); }
+.tk-leg { display: flex; gap: 12px; padding: 12px 14px 12px 11px; border-top: 1px solid var(--line); border-left: 4px solid var(--ink); }
+.tk-leg.k-corners { border-left-color: var(--pitch); }
+.tk-leg.k-cards { border-left-color: var(--yellow); }
+.tk-leg.k-sot, .tk-leg.k-shots { border-left-color: #0F6A8B; }
+.tk-leg.k-player { border-left-color: #5B3A8E; }
+.tk-leg.open { background: var(--pitch-2); }
+.tk-cat { display: block; font-size: 0.76rem; font-weight: 600; color: var(--ink-2); }
+.tk-lbl { font-weight: 600; line-height: 1.3; }
+.tk-why { font-size: 0.82rem; color: var(--ink-2); margin-top: 3px; }
+.tk-side { flex: none; min-width: 66px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.tk-p { font-family: var(--display); font-weight: 700; font-size: 1.45rem; line-height: 1; }
+.tk-price { font-family: var(--display); font-weight: 600; }
+.tk-price i { font-family: var(--body); font-weight: 400; font-size: 0.75rem; color: var(--ink-2); }
+.tk-swap { margin-top: 4px; background: var(--sheet); border: 1.5px solid var(--ink); border-radius: 999px; padding: 3px 11px; font-size: 0.82rem; font-weight: 600; }
+.tk-swaps { background: var(--paper); padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+.tk-alt { display: flex; width: 100%; gap: 10px; align-items: center; text-align: left; background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; margin-top: 6px; }
+.tk-alt .grow > * { display: block; }
+.tk-alt.short { opacity: 0.7; }
+.tk-res { flex: none; text-align: right; display: flex; flex-direction: column; }
+.tk-res b { font-family: var(--display); font-size: 1.15rem; }
+.tk-perf { position: relative; border-top: 2px dashed var(--line); margin: 0 14px; }
+.tk-perf::before, .tk-perf::after { content: ''; position: absolute; top: -10px; width: 18px; height: 18px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); }
+.tk-perf::before { left: -24px; } .tk-perf::after { right: -24px; }
+.tk-foot { padding: 12px 14px 14px; }
+.tk-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.tk-row b { font-family: var(--display); font-size: 1.1rem; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-window.TEAMSHEET_VERSION='202611222011';
+window.TEAMSHEET_VERSION='202611241948';
 /* ===== stats.js ===== */
 /* Probability engine: count distributions, joint team-stat model, Dixon-Coles score matrix. */
 (function (root) {
@@ -3013,7 +3067,13 @@ window.TEAMSHEET_VERSION='202611222011';
           const markets = MK.buildMarkets(pred, settings.rules);
           if (odds.has(fx.id) && !D.isFinished(fx)) MK.attachOdds(markets, odds.get(fx.id), settings.prefBook, !!factors.goals.market);
           if (D.isFinished(fx)) for (const m of markets) m.result = MK.settle(m, fx);
-          results.push({ fixture: fx, team, lineupStatus: pred.lineupStatus, markets, finished: D.isFinished(fx) });
+          const formOf = (tid) => {
+            const rows = pool.filter((g) => (g.home.id === tid || g.away.id === tid) && g.ts < fx.ts && g.goals).sort((a, b) => b.ts - a.ts).slice(0, 6).map((g) => teamRow(g, tid));
+            if (!rows.length) return null;
+            return { n: rows.length, w: rows.filter((r) => r.res === 'W').length, d: rows.filter((r) => r.res === 'D').length, seq: rows.map((r) => r.res).join(''),
+              gf: rows.reduce((a, r) => a + r.gf, 0) / rows.length, ga: rows.reduce((a, r) => a + r.ga, 0) / rows.length };
+          };
+          results.push({ fixture: fx, team, factors, lineupStatus: pred.lineupStatus, markets, finished: D.isFinished(fx), form: { home: formOf(fx.home.id), away: formOf(fx.away.id) } });
         }
       }
       const all = results.flatMap((r) => r.markets);
@@ -3043,6 +3103,16 @@ window.TEAMSHEET_VERSION='202611222011';
       return j.response.map((x) => x.team).sort((a, b) => a.name.localeCompare(b.name));
     }
 
+    /* Several consecutive days (for accumulators). */
+    async function scanDays(startDate, days, leagueIds, progress) {
+      const out = [];
+      for (let i = 0; i < days; i++) {
+        const d = new Date(Date.parse(startDate + 'T12:00:00Z') + i * DAY).toISOString().slice(0, 10);
+        out.push(await scanDay(d, leagueIds, (m) => progress && progress(`Day ${i + 1} of ${days}: ${m}`)));
+      }
+      return out;
+    }
+
     /* Latest score, team stats, player stats and events for a live (or just finished) match. */
     async function liveUpdate(fid) {
       const j = await client.get('fixtures', { id: fid, timezone: settings.tz }, 20000);
@@ -3050,7 +3120,7 @@ window.TEAMSHEET_VERSION='202611222011';
       return D.normFixture(j.response[0]);
     }
 
-    return { liveUpdate, analyseFixture, analyseTeams, scanDay, upcoming, teams, leagueInfo, leagueSeason, settings, client };
+    return { scanDays, liveUpdate, analyseFixture, analyseTeams, scanDay, upcoming, teams, leagueInfo, leagueSeason, settings, client };
   }
 
   FP.engine = { create, LEAGUE_PRESETS, EXTRA_PRESETS, DEMO_LEAGUES, STATS };
@@ -3218,6 +3288,503 @@ window.TEAMSHEET_VERSION='202611222011';
   FP.tracker = { KEY, load, save, createBet, settleLeg, settleBet, pendingFixtures, applyResults, setManual, summary, calibration, toCSV, importJSON, SETTLE_AFTER };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
+/* ===== acca.js ===== */
+/* Accumulator builders: teams to win reaching a target price with the best chance of landing, and Acca Freeze. */
+(function (root) {
+  'use strict';
+  const FP = (root.FP = root.FP || {});
+  const S = FP.stats;
+  const EST_MARGIN = 0.06; // when no bookmaker price exists, assume a typical 6% margin on the model's fair odds
+
+  /* P(team scores the first goal) under the match's goal rates (goals arrive as independent Poisson streams). */
+  function scoreFirst(lFor, lAg) {
+    const t = lFor + lAg;
+    return t > 0 ? (lFor / t) * (1 - Math.exp(-t)) : 0;
+  }
+
+  /* P(team is ahead at some point in the match). Goals arrive as a Poisson process with total rate lFor + lAg and
+     each goal is theirs with probability q, so the score difference is a random walk over a Poisson number of steps.
+     The team leads at some point if that walk ever reaches +1. Scoring first is one way; going behind and then
+     turning it round is the other. */
+  function leadsAtSomePoint(lFor, lAg) {
+    const t = lFor + lAg;
+    if (!(t > 0) || !(lFor > 0)) return 0;
+    const q = lFor / t;
+    let nMax = 10;
+    while (nMax < 60 && Math.exp(-t + nMax * Math.log(t) - S.lgamma(nMax + 1)) > 1e-12) nMax++;
+    let alive = new Float64Array(nMax + 2); // alive[i]: never led yet, currently i goals behind or level (i = 0)
+    alive[0] = 1;
+    let led = 0, out = 0, pn = Math.exp(-t);
+    for (let n = 0; n <= nMax; n++) {
+      out += pn * led;
+      const nx = new Float64Array(nMax + 2);
+      for (let i = 0; i <= n && i <= nMax; i++) {
+        const a = alive[i];
+        if (!a) continue;
+        if (i === 0) led += a * q; else nx[i - 1] += a * q;
+        if (i + 1 <= nMax + 1) nx[i + 1] += a * (1 - q);
+      }
+      alive = nx;
+      pn *= t / (n + 1);
+    }
+    return Math.min(1, out);
+  }
+
+  /* Backtest on 2025/26 (5 leagues, 1,752 matches, backtest/freeze_bt.js): the walk maths matched how often
+     teams were ahead at half-time or full-time, but prices overrate outsiders a little (favourite-longshot bias),
+     so underdogs were ahead about 8% less often than predicted. Scale the chance down for them; never up. */
+  const leadCalib = (pWin) => Math.min(1, 0.8 + 0.55 * pWin);
+
+  /* One candidate per team per match: win chance, price, form and the numbers behind the justification. */
+  function candidates(dayResults, opts) {
+    opts = opts || {};
+    const now = opts.now || Date.now();
+    const out = [];
+    for (const day of dayResults) for (const r of day.fixtures) {
+      const f = r.fixture;
+      if (f.status !== 'NS' || f.ts < now) continue; // not started only
+      const g = r.team.goals;
+      for (const side of ['H', 'A']) {
+        const isH = side === 'H';
+        const m = r.markets.find((x) => x.family === (isH ? 'res-H' : 'res-A'));
+        const p = isH ? g.oneXtwo.h : g.oneXtwo.a;
+        if (!(p > 0)) continue;
+        const priced = !!(m && m.price);
+        const dec = priced ? m.price : Math.max(1.01, +(1 / (p * (1 + EST_MARGIN))).toFixed(2));
+        out.push({
+          id: `${f.id}:${side}`, fixtureId: f.id, side, fixture: f, kickoff: f.ts, comp: f.compName,
+          team: isH ? f.home.name : f.away.name, opp: isH ? f.away.name : f.home.name, home: isH,
+          p, dec, priced, book: priced ? m.priceBook : null, implied: priced ? 1 / m.price : null,
+          pFirst: scoreFirst(isH ? g.lh : g.la, isH ? g.la : g.lh) * leadCalib(p), pLead: leadsAtSomePoint(isH ? g.lh : g.la, isH ? g.la : g.lh) * leadCalib(p), pDraw: g.oneXtwo.d,
+          xgFor: isH ? g.lh : g.la, xgAg: isH ? g.la : g.lh,
+          form: r.form ? r.form[isH ? 'home' : 'away'] : null, oppForm: r.form ? r.form[isH ? 'away' : 'home'] : null,
+          lineup: r.lineupStatus, anchored: !!(r.factors && r.factors.goals && r.factors.goals.market),
+          market: m || null,
+        });
+      }
+    }
+    return out;
+  }
+
+  /* Choose exactly n teams (at most one per match) whose combined odds reach target, maximising the chance that
+     all win. Dynamic programme over matches with odds bucketed on a log scale. */
+  function buildWinAcca(cands, n, target, opts) {
+    opts = opts || {};
+    const minLeg = opts.minLegOdds || 1.01;
+    const STEP = 0.005;
+    const B = Math.max(1, Math.ceil(Math.log(target) / STEP));
+    const groups = new Map();
+    for (const c of cands) {
+      if (c.dec < minLeg) continue;
+      if (opts.exclude && opts.exclude.has(c.fixtureId)) continue;
+      if (!groups.has(c.fixtureId)) groups.set(c.fixtureId, []);
+      groups.get(c.fixtureId).push(c);
+    }
+    const G = [...groups.values()];
+    if (G.length < n) return { ok: false, reason: `Only ${G.length} matches are available, fewer than the ${n} teams asked for.` };
+    // dp[k][b] = best sum log p using k legs reaching bucket b (b capped at B)
+    const NEG = -Infinity;
+    let dp = Array.from({ length: n + 1 }, () => new Float64Array(B + 1).fill(NEG));
+    dp[0][0] = 0;
+    const choice = []; // per group: Int32 arrays of picks
+    for (let gi = 0; gi < G.length; gi++) {
+      const next = dp.map((row) => Float64Array.from(row));
+      const pick = Array.from({ length: n + 1 }, () => new Int32Array(B + 1).fill(-1));
+      for (let k = n - 1; k >= 0; k--) {
+        const row = dp[k];
+        for (let b = 0; b <= B; b++) {
+          if (row[b] === NEG) continue;
+          G[gi].forEach((c, ci) => {
+            const nb = Math.min(B, b + Math.round(Math.log(c.dec) / STEP));
+            const v = row[b] + Math.log(c.p);
+            if (v > next[k + 1][nb]) { next[k + 1][nb] = v; pick[k + 1][nb] = ci * (B + 1) + b; }
+          });
+        }
+      }
+      choice.push(pick);
+      dp = next;
+    }
+    if (dp[n][B] === NEG) {
+      // the most the n best-priced legs can reach
+      let best = 0;
+      for (let b = B; b >= 0; b--) if (dp[n][b] !== NEG) { best = b; break; }
+      return { ok: false, reason: `${n} teams cannot reach those odds from the available matches. The longest acca they make is about ${Math.exp(best * STEP).toFixed(2)}.` };
+    }
+    // backtrack
+    const legs = [];
+    let k = n, b = B;
+    for (let gi = G.length - 1; gi >= 0 && k > 0; gi--) {
+      const pc = choice[gi][k][b];
+      if (pc < 0) continue; // this group was not used at this state
+      const ci = Math.floor(pc / (B + 1)), pb = pc % (B + 1);
+      legs.push(G[gi][ci]);
+      k--; b = pb;
+    }
+    legs.sort((x, y) => x.kickoff - y.kickoff);
+    return Object.assign({ ok: true }, totals(legs));
+  }
+
+  function totals(legs) {
+    const p = legs.reduce((a, c) => a * c.p, 1);
+    const dec = legs.reduce((a, c) => a * c.dec, 1);
+    return { legs, p, dec, value: p * dec - 1, allPriced: legs.every((c) => c.priced) };
+  }
+
+  /* Acca Freeze (Sky Bet, match result accas of 5 legs or more): one leg can be frozen while that team is winning,
+     and it is then settled as a winner. The freeze leg is the least likely winner in the acca, a bigger-priced team
+     that still has a real chance of being in front at some point. Frozen the moment they go ahead, that leg lands
+     with P(leads at some point) rather than P(wins). It is ranked by that chance times its price, the return the
+     leg gives when frozen, among teams with at least minLead chance of leading. The other legs are the strongest
+     favourites from other matches. */
+  function buildFreeze(cands, nOthers, opts) {
+    opts = opts || {};
+    const freezeMin = opts.freezeMinOdds || 2.5, legMin = opts.minLegOdds || 1.2, minLead = opts.minLead != null ? opts.minLead : 0.3;
+    const others0 = cands.filter((c) => c.dec >= legMin).sort((a, b) => b.p - a.p);
+    const pool = cands.filter((c) => c.dec >= freezeMin && c.pLead >= minLead);
+    if (!pool.length) return { ok: false, reason: `No team priced ${freezeMin.toFixed(2)} or more has a ${Math.round(minLead * 100)}% chance of leading at some point in the chosen days. Try a lower freeze price or a lower chance of leading.` };
+    const score = (c) => c.pLead * c.dec;
+    const ranked = pool.slice().sort((a, b) => score(b) - score(a));
+    const pickOthers = (freeze) => {
+      const legs = [], used = new Set([freeze.fixtureId]);
+      for (const c of others0) { if (legs.length >= nOthers) break; if (used.has(c.fixtureId)) continue; legs.push(c); used.add(c.fixtureId); }
+      return legs;
+    };
+    const freeze = ranked[0];
+    const legs = pickOthers(freeze);
+    if (legs.length < nOthers) return { ok: false, reason: `Only ${legs.length} other teams priced at ${legMin.toFixed(2)} or more were found.` };
+    legs.sort((x, y) => x.kickoff - y.kickoff);
+    const t = totals([freeze].concat(legs));
+    const pOthers = legs.reduce((a, c) => a * c.p, 1);
+    const pWithFreeze = freeze.pLead * pOthers;
+    return Object.assign({ ok: true, freeze, others: legs, pOthers, pWithFreeze, valueWithFreeze: pWithFreeze * t.dec - 1,
+      freezeLeast: legs.every((c) => c.p > freeze.p), alternatives: ranked.slice(1, 5) }, t);
+  }
+
+  const pct = (p) => Math.round(p * 100) + '%';
+  function formLine(f) {
+    if (!f || !f.n) return null;
+    return `won ${f.w} of their last ${f.n} (${f.seq}), scoring ${f.gf.toFixed(1)} and conceding ${f.ga.toFixed(1)} a game`;
+  }
+
+  /* Plain-English reasons for a selection, built from the numbers behind it. */
+  function justify(c, role) {
+    const parts = [];
+    const where = c.home ? 'at home to' : 'away at';
+    if (role === 'freeze') {
+      parts.push(`${c.team} ${where} ${c.opp}: only ${pct(c.p)} to win, but ${pct(c.pLead)} to be in front at some point (${pct(c.pFirst)} by scoring first, the rest by coming from behind).`);
+      parts.push(`Freeze them the moment they go ahead and this leg lands ${pct(c.pLead)} of the time instead of ${pct(c.p)}.`);
+      parts.push(`Expected goals ${c.xgFor.toFixed(2)} against ${c.xgAg.toFixed(2)}.`);
+    } else {
+      parts.push(`${c.team} ${where} ${c.opp}: ${pct(c.p)} to win, ${pct(c.pDraw)} draw.`);
+      parts.push(`Expected goals ${c.xgFor.toFixed(2)} to ${c.xgAg.toFixed(2)}.`);
+    }
+    const fl = formLine(c.form), ol = c.oppForm && c.oppForm.n ? `${c.opp} have won ${c.oppForm.w} of ${c.oppForm.n} (${c.oppForm.seq})` : null;
+    if (fl) parts.push(`${c.team} have ${fl}${ol ? '; ' + ol : ''}.`);
+    if (c.priced) {
+      const edge = c.p - c.implied;
+      const bk = /^median/.test(c.book || '') ? 'bookmaker' : c.book;
+      parts.push(Math.abs(edge) < 0.02 ? `The ${bk} price agrees with the model.` : edge > 0 ? `The model rates them ${Math.round(edge * 100)} points above the ${bk} price.` : `The ${bk} price implies ${Math.round(-edge * 100)} points more than the model's chance, so this leg costs a little value.`);
+    } else parts.push('No bookmaker price yet, so the odds shown are estimated from the model.');
+    if (c.lineup === 'confirmed') parts.push('Team sheets confirmed.');
+    return parts.join(' ');
+  }
+
+  FP.acca = { scoreFirst, leadsAtSomePoint, candidates, buildWinAcca, buildFreeze, totals, justify, EST_MARGIN };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+/* ===== builder.js ===== */
+/* Bet builder generator: from one or more analysed matches, pick likely events whose combined odds reach a target,
+   with the highest chance of every leg landing. Legs from the same team market (goals and result, corners, cards,
+   shots, shots on target) are priced from the joint score distribution, so linked legs are not double counted. */
+(function (root) {
+  'use strict';
+  const FP = (root.FP = root.FP || {});
+  const S = FP.stats;
+  const BB_MARGIN = 0.08; // bet builder legs with no bookmaker price: assume a typical 8% margin on the fair odds
+  const STEP = 0.005;     // odds grid on the log scale (0.5%)
+
+  /* ---------- what each market means on the score grid ---------- */
+  // stat matrix used, the "base" (two legs with the same base cannot be paired) and the cell test
+  function teamSpec(m) {
+    const f = m.family, l = Math.abs(m.level);
+    let r;
+    if ((r = f.match(/^res-([HDA])$/))) return { stat: 'goals', base: 'result', test: r[1] === 'H' ? (i, j) => i > j : r[1] === 'D' ? (i, j) => i === j : (i, j) => i < j };
+    if ((r = f.match(/^dc-(1X|X2|12)$/))) return { stat: 'goals', base: 'result', test: r[1] === '1X' ? (i, j) => i >= j : r[1] === 'X2' ? (i, j) => i <= j : (i, j) => i !== j };
+    if (f === 'btts-y') return { stat: 'goals', base: 'btts', test: (i, j) => i > 0 && j > 0 };
+    if (f === 'btts-n') return { stat: 'goals', base: 'btts', test: (i, j) => !(i > 0 && j > 0) };
+    if ((r = f.match(/^g-(tot|H|A)-(o|u)$/))) {
+      const v = r[1] === 'tot' ? (i, j) => i + j : r[1] === 'H' ? (i) => i : (i, j) => j;
+      return { stat: 'goals', base: 'g' + r[1], test: r[2] === 'o' ? (i, j) => v(i, j) > l : (i, j) => v(i, j) < l };
+    }
+    if ((r = f.match(/^(corners|cards|sot|shots)-(tot|H|A)-(o|u)$/))) {
+      const v = r[2] === 'tot' ? (i, j) => i + j : r[2] === 'H' ? (i) => i : (i, j) => j;
+      return { stat: r[1], base: r[1] + r[2], test: r[3] === 'o' ? (i, j) => v(i, j) > l : (i, j) => v(i, j) < l };
+    }
+    if ((r = f.match(/^(corners|cards|sot|shots)-both$/))) return { stat: r[1], base: r[1] + 'both', test: (i, j) => i >= l && j >= l };
+    if ((r = f.match(/^(corners|cards|sot|shots)-most-([HA])$/))) return { stat: r[1], base: r[1] + 'most', test: r[2] === 'H' ? (i, j) => i > j : (i, j) => j > i };
+    return null;
+  }
+  const GROUP_NAME = { goals: 'Result and goals', corners: 'Corners', cards: 'Cards', sot: 'Shots on target', shots: 'Shots' };
+
+  /* ---------- candidate legs from one analysed match ---------- */
+  function matchCandidates(rep, opts) {
+    const minP = opts.minLegP, maxP = opts.maxLegP || 0.95, minDec = opts.minLegOdds || 1.05;
+    const fx = rep.fixture, confirmed = rep.lineupStatus === 'confirmed';
+    const ctx = { fixture: fx, joints: {}, rep, confirmed };
+    for (const st of ['goals', 'corners', 'cards', 'sot', 'shots']) if (rep.team[st]) ctx.joints[st] = rep.team[st].joint;
+    const players = new Map();
+    for (const side of ['home', 'away']) for (const p of rep.players[side] || []) players.set(String(p.id), p);
+    const out = [];
+    for (const m of rep.markets) {
+      if (!(m.p >= minP && m.p <= maxP)) continue;
+      let key, spec = null, pl = null;
+      if (m.isPlayer) {
+        if (opts.includePlayers === false) continue;
+        pl = players.get(String(m.playerId));
+        if (!pl) continue;
+        // confirmed team sheets: starting XI only; otherwise only players very likely to start
+        if (confirmed ? pl.status !== 'start' : !(pl.status !== 'out' && pl.status !== 'doubt' && (pl.pStart || 0) >= 0.8)) continue;
+        key = 'pl:' + m.playerId;
+      } else {
+        spec = teamSpec(m);
+        if (!spec || !ctx.joints[spec.stat]) continue;
+        key = spec.stat;
+      }
+      const priced = !!m.price;
+      const dec = priced ? m.price : Math.max(1.01, +(1 / (m.p * (1 + BB_MARGIN))).toFixed(3));
+      if (dec < minDec) continue;
+      out.push({ id: m.id, m, fixtureId: fx.id, key, gkey: fx.id + '|' + key, spec, player: pl, p: m.p, dec, priced, book: priced ? m.priceBook : null, starter: pl ? (confirmed ? 'confirmed' : 'predicted') : null });
+    }
+    return { ctx, cands: out };
+  }
+
+  /* ---------- joint chance and price of a set of legs ---------- */
+  // legs in one team group: joint chance from the score grid; price = product of leg prices scaled by how much
+  // the joint chance differs from the product of chances (what a bookmaker does for linked bet builder legs)
+  function groupEval(legs, ctx) {
+    const pInd = legs.reduce((a, c) => a * c.p, 1), dInd = legs.reduce((a, c) => a * c.dec, 1);
+    if (legs.length === 1 || !legs[0].spec) return { p: pInd, dec: dInd };
+    const J = ctx.joints[legs[0].spec.stat];
+    const tests = legs.map((c) => c.spec.test);
+    const p = S.cellsWhere(J, (i, j) => tests.every((t) => t(i, j)));
+    return { p, dec: Math.max(1.01, dInd * (pInd / Math.max(p, 1e-9))) };
+  }
+  function compatible(legs) {
+    // at most two legs per team group, different bases, and neither close to implying the other
+    if (legs.length > 2) return false;
+    if (legs[0].player) return legs.length === 1;
+    if (legs.length === 2 && legs[0].spec.base === legs[1].spec.base) return false;
+    return true;
+  }
+  function evaluate(legs, ctxs) {
+    const groups = new Map();
+    for (const c of legs) { if (!groups.has(c.gkey)) groups.set(c.gkey, []); groups.get(c.gkey).push(c); }
+    let p = 1, dec = 1, ok = true;
+    for (const g of groups.values()) {
+      if (!compatible(g)) ok = false;
+      const e = groupEval(g, ctxs.get(g[0].fixtureId));
+      if (g.length === 2 && e.p > 0.98 * Math.min(g[0].p, g[1].p)) ok = false; // one leg makes the other certain
+      p *= e.p; dec *= e.dec;
+    }
+    return { p, dec, ok };
+  }
+
+  /* ---------- options per group: single legs and compatible pairs ---------- */
+  function groupOptions(cands, ctx, exclude) {
+    const byKey = new Map();
+    for (const c of cands) {
+      if (exclude && (exclude.ids.has(c.id) || exclude.groups.has(c.gkey))) continue;
+      if (!byKey.has(c.gkey)) byKey.set(c.gkey, []);
+      byKey.get(c.gkey).push(c);
+    }
+    const groups = [];
+    for (const [gkey, list] of byKey) {
+      const opts = list.map((c) => ({ legs: [c], p: c.p, dec: c.dec }));
+      if (!list[0].player) {
+        for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+          const pair = [list[a], list[b]];
+          if (!compatible(pair)) continue;
+          const e = groupEval(pair, ctx);
+          if (e.p > 0.98 * Math.min(list[a].p, list[b].p) || e.p < 0.2) continue;
+          opts.push({ legs: pair, p: e.p, dec: e.dec });
+        }
+      }
+      for (const o of opts) { o.lp = Math.log(o.p); o.lb = Math.floor(Math.log(o.dec) / STEP); o.n = o.legs.length; }
+      groups.push({ gkey, fixtureId: list[0].fixtureId, opts });
+    }
+    return groups;
+  }
+
+  /* ---------- optimiser ----------
+     Choose at most one option per group, at least one leg from every match, between minLegs and maxLegs legs in
+     total, so that the combined odds reach the target and the sum of log chances is as high as possible.
+     Dynamic programme over groups; odds are rounded down onto the grid so the real odds always reach the target. */
+  function solve(groups, fixtureIds, target, minLegs, maxLegs) {
+    const K = maxLegs, B = Math.max(1, Math.ceil(Math.log(target) / STEP)), W = (K + 1) * (B + 1);
+    const NEG = -Infinity;
+    let v0 = new Float64Array(W).fill(NEG), v1 = new Float64Array(W).fill(NEG); // flag: this match has a leg yet
+    v0[0] = 0;
+    const byMatch = fixtureIds.map((fid) => groups.filter((g) => g.fixtureId === fid));
+    if (byMatch.some((g) => !g.length)) return null;
+    const choices = []; // per match, per group: Int32Array over (k, b) for flag 1
+    for (let mi = 0; mi < byMatch.length; mi++) {
+      if (mi > 0) { v0 = v1; v1 = new Float64Array(W).fill(NEG); } // the previous match must have a leg
+      const mc = [];
+      for (const g of byMatch[mi]) {
+        const n1 = Float64Array.from(v1);
+        const ch = new Int32Array(W);
+        for (let f = 0; f < 2; f++) {
+          const v = f ? v1 : v0;
+          for (let k = 0; k < K; k++) for (let b = 0; b <= B; b++) {
+            const x = v[k * (B + 1) + b];
+            if (x === NEG) continue;
+            for (let oi = 0; oi < g.opts.length; oi++) {
+              const o = g.opts[oi], k2 = k + o.n;
+              if (k2 > K) continue;
+              const b2 = Math.min(B, b + o.lb), idx = k2 * (B + 1) + b2, y = x + o.lp;
+              if (y > n1[idx]) { n1[idx] = y; ch[idx] = ((oi + 1) << 11) | (f << 10) | b; }
+            }
+          }
+        }
+        v1 = n1; mc.push(ch);
+      }
+      choices.push(mc);
+    }
+    let bestK = -1, bestV = NEG;
+    for (let k = Math.max(1, minLegs); k <= K; k++) { const x = v1[k * (B + 1) + B]; if (x > bestV) { bestV = x; bestK = k; } }
+    if (bestK < 0) return null;
+    const picked = [];
+    let k = bestK, b = B;
+    for (let mi = byMatch.length - 1; mi >= 0; mi--) {
+      let f = 1;
+      for (let gi = byMatch[mi].length - 1; gi >= 0; gi--) {
+        if (f === 0) break;
+        const code = choices[mi][gi][k * (B + 1) + b];
+        if (!code) continue;
+        const o = byMatch[mi][gi].opts[(code >> 11) - 1];
+        picked.push(o);
+        k -= o.n; f = (code >> 10) & 1; b = code & 1023;
+      }
+    }
+    return picked;
+  }
+
+  /* ---------- public: build one or two bet builders ---------- */
+  function prepare(reports, opts) {
+    const ctxs = new Map(), cands = [], skipped = [];
+    for (const rep of reports) {
+      const f = rep.fixture;
+      if (f.status !== 'NS' || f.ts < (opts.now || Date.now())) { skipped.push({ fixture: f, reason: 'has already kicked off' }); continue; }
+      const r = matchCandidates(rep, opts);
+      if (!r.cands.length) { skipped.push({ fixture: f, reason: 'has no selections at the chance you set' }); continue; }
+      ctxs.set(f.id, r.ctx);
+      for (const c of r.cands) cands.push(c);
+    }
+    return { ctxs, cands, skipped, fixtureIds: [...ctxs.keys()] };
+  }
+  function build(prep, opts, exclude) {
+    const target = opts.target, n = prep.fixtureIds.length;
+    if (!n) return { ok: false, reason: 'None of the chosen matches can be used.' };
+    if (!(target > 1) || target > 101) return { ok: false, reason: 'Choose odds between 1/10 and 100/1.' };
+    const minLegs = Math.max(2, n), maxLegs = Math.max(minLegs, Math.min(opts.maxLegs || 8, 12));
+    const groups = [];
+    for (const fid of prep.fixtureIds) for (const g of groupOptions(prep.cands.filter((c) => c.fixtureId === fid), prep.ctxs.get(fid), exclude)) groups.push(g);
+    const picked = solve(groups, prep.fixtureIds, target, minLegs, maxLegs);
+    if (!picked) {
+      const most = prep.cands.slice().sort((a, b) => b.dec - a.dec);
+      return { ok: false, reason: `With up to ${maxLegs} selections at ${Math.round(opts.minLegP * 100)}% or more each, these matches cannot reach those odds. Lower the odds, allow more selections, lower the chance per selection or add a match.`, longest: most[0] };
+    }
+    const legs = [];
+    for (const o of picked) for (const c of o.legs) legs.push(c);
+    return finish(legs, prep, opts);
+  }
+  function finish(legs, prep, opts) {
+    legs.sort((a, b) => (a.m.kickoff - b.m.kickoff) || (a.fixtureId > b.fixtureId ? 1 : a.fixtureId < b.fixtureId ? -1 : 0) || order(a) - order(b) || b.p - a.p);
+    const e = evaluate(legs, prep.ctxs);
+    const pInd = legs.reduce((a, c) => a * c.p, 1);
+    return { ok: true, legs, p: e.p, dec: e.dec, value: e.p * e.dec - 1, meets: e.dec >= opts.target * 0.999, linkedAdj: Math.abs(e.p - pInd) > 0.002, allPriced: legs.every((c) => c.priced) };
+  }
+  const order = (c) => (c.player ? 2 : c.key === 'goals' ? 0 : 1);
+  function buildTwo(reports, opts) {
+    const prep = prepare(reports, opts);
+    const a = build(prep, opts);
+    let b = null;
+    if (a.ok) {
+      b = build(prep, opts, { ids: new Set(), groups: new Set(a.legs.map((c) => c.gkey)) });
+      if (!b.ok) b = build(prep, opts, { ids: new Set(a.legs.map((c) => c.id)), groups: new Set() });
+      if (b.ok && b.legs.map((c) => c.id).sort().join() === a.legs.map((c) => c.id).sort().join()) b = { ok: false, reason: 'No different combination reaches the odds.' };
+    }
+    return { prep, builders: [a, b].filter(Boolean), skipped: prep.skipped };
+  }
+
+  /* ---------- swaps ---------- */
+  // other single legs from the same match that keep the builder valid, best first: those still reaching the odds
+  // by chance of the whole builder, then the rest by odds
+  function swapOptions(builder, idx, prep, opts, limit) {
+    const out = builder.legs[idx];
+    const ids = new Set(builder.legs.map((c) => c.id));
+    const res = [];
+    for (const c of prep.cands) {
+      if (c.fixtureId !== out.fixtureId || ids.has(c.id)) continue;
+      const legs = builder.legs.slice(); legs[idx] = c;
+      const e = evaluate(legs, prep.ctxs);
+      if (!e.ok) continue;
+      res.push({ c, p: e.p, dec: e.dec, meets: e.dec >= opts.target * 0.999 });
+    }
+    res.sort((x, y) => (y.meets - x.meets) || (x.meets ? y.p - x.p : y.dec - x.dec));
+    return res.slice(0, limit || 6);
+  }
+  function applySwap(builder, idx, cand, prep, opts) {
+    const legs = builder.legs.slice(); legs[idx] = cand;
+    return finish(legs, prep, opts);
+  }
+  function removeLeg(builder, idx, prep, opts) {
+    const legs = builder.legs.filter((_, i) => i !== idx);
+    return legs.length ? finish(legs, prep, opts) : null;
+  }
+
+  /* ---------- reasons ---------- */
+  const STATKEY = { fc: 'fc', fd: 'fd', shots: 'shots', sot: 'sot', goal: 'goals', saves: 'saves', card: 'card' };
+  const per90Word = { fc: 'fouls', fd: 'times fouled', shots: 'shots', sot: 'shots on target', goals: 'goals', saves: 'saves' };
+  function justify(c, prep) {
+    const rep = prep.ctxs.get(c.fixtureId).rep, fx = rep.fixture;
+    if (c.player) {
+      const mm = c.m.family.match(/^p-([a-z]+)-/), k = STATKEY[mm[1]], lv = c.m.level || 1;
+      const log = c.player.log || { rows: [] }, played = log.rows.filter((r) => r.min > 0);
+      const hit = played.filter((r) => (k === 'card' ? r.yc > 0 || r.rc > 0 : (r[k] || 0) >= lv)).length;
+      const parts = [];
+      if (played.length) parts.push(`Landed in ${hit} of his last ${played.length} games`);
+      if (k !== 'card' && log.per90 && log.per90[k] != null) parts.push(`${log.per90[k].toFixed(1)} ${per90Word[k]} per 90`);
+      parts.push(c.starter === 'confirmed' ? 'in the starting XI' : 'expected to start');
+      return parts.join(', ') + '.';
+    }
+    const H = fx.home.name, A = fx.away.name, fh = rep.form.home.rows, fa = rep.form.away.rows;
+    const count = (rows, fn) => { let n = 0, t = 0; for (const r of rows) { const x = fn(r); if (x == null) continue; t++; if (x) n++; } return t ? { n, t } : null; };
+    const poss = (w) => (/s$/.test(w) ? w + "'" : w + "'s");
+    const inLast = (who, k) => (k ? `${k.n} of ${poss(who)} last ${k.t}` : null);
+    const f = c.m.family, l = Math.abs(c.m.level), st = c.spec.stat, T = rep.team[st];
+    const col = { goals: ['gf', 'ga'], corners: ['cornersF', 'cornersA'], cards: ['cardsF', 'cardsA'], sot: ['sotF', 'sotA'], shots: ['shotsF', null] }[st];
+    const F = (r) => r[col[0]], Ag = (r) => (col[1] ? r[col[1]] : null);
+    const two = (fn) => { const x = inLast(H, count(fh, fn)), y = inLast(A, count(fa, fn)); return x && y ? `Landed in ${x} and ${y}.` : x || y ? `Landed in ${x || y}.` : ''; };
+    const word = { goals: 'goals', corners: 'corners', cards: 'cards', sot: 'shots on target', shots: 'shots' }[st];
+    let hist = '', exp = '', r;
+    if ((r = f.match(/^res-([HDA])$/)) || (r = f.match(/^dc-(1X|X2|12)$/))) {
+      const w = count(fh, (x) => x.res ? x.res === 'W' : null), v = count(fa, (x) => x.res ? x.res === 'W' : null);
+      if (w && v) hist = `${H} won ${w.n} of their last ${w.t}, ${A} ${v.n} of ${v.t}.`;
+    } else if (/^btts/.test(f)) { const y = f === 'btts-y'; hist = two((x) => (x.btts == null ? null : x.btts === y)); }
+    else if ((r = f.match(/-(tot|H|A)-(o|u)$/))) {
+      const over = r[2] === 'o', test = (v) => (v == null ? null : over ? v > l : v < l);
+      if (r[1] === 'tot') { if (col[1]) hist = two((x) => (F(x) == null || Ag(x) == null ? null : test(F(x) + Ag(x)))); exp = `${(T.lh + T.la).toFixed(1)} ${word} expected in the match`; }
+      else { const home = r[1] === 'H', k = count(home ? fh : fa, (x) => test(F(x))); if (k) hist = `Landed in ${inLast(home ? H : A, k)}.`; exp = `${(home ? T.lh : T.la).toFixed(1)} expected for ${home ? H : A}`; }
+    } else if (/-both$/.test(f)) { if (col[1]) hist = two((x) => (F(x) == null || Ag(x) == null ? null : F(x) >= l && Ag(x) >= l)); exp = `${T.lh.toFixed(1)} expected for ${H}, ${T.la.toFixed(1)} for ${A}`; }
+    else if ((r = f.match(/-most-([HA])$/))) { const home = r[1] === 'H', k = count(home ? fh : fa, (x) => (F(x) == null || Ag(x) == null ? null : F(x) > Ag(x))); if (k) hist = `${home ? H : A} had more in ${k.n} of their last ${k.t}.`; exp = `${T.lh.toFixed(1)} expected for ${H}, ${T.la.toFixed(1)} for ${A}`; }
+    if (st === 'goals') exp = rep.factors.goals && rep.factors.goals.market ? 'Chance anchored to bookmaker prices' : `${T.lh.toFixed(1)} goals expected for ${H}, ${T.la.toFixed(1)} for ${A}`;
+    return [hist, exp ? exp + '.' : ''].filter(Boolean).join(' ');
+  }
+
+  FP.builder = { teamSpec, matchCandidates, evaluate, prepare, build, buildTwo, swapOptions, applySwap, removeLeg, justify, solve, groupOptions, GROUP_NAME, BB_MARGIN, STEP };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
 /* ===== ui.js ===== */
 /* Mobile user interface. */
 (function (root) {
@@ -3264,6 +3831,8 @@ window.TEAMSHEET_VERSION='202611222011';
     settings: loadSettings(), view: 'match', status: null, statusErr: null, slip: [], slipOpen: false, bets: [], betsUi: { period: 'all', show: 20, armed: null, busy: false, msg: '', keep: false },
     match: { league: null, mode: 'fixtures', list: null, teams: null, home: '', away: '', report: null, loading: null, error: null, tab: 'picks', side: 'home', open: new Set(), pickList: 'best', live: null, liveSide: 'home', liveErr: null },
     day: { date: londonISO(Date.now()), leagues: null, report: null, loading: null, error: null, tab: 'best', group: 'all' },
+    build: { league: null, lists: new Map(), selected: new Map(), target: '5/1', minP: 0.65, maxLegs: 8, players: true, reports: new Map(), loading: null, error: null, result: null, active: 0, swap: null },
+    acca: { mode: 'win', start: londonISO(Date.now()), days: 1, leagues: null, n: 4, target: '5/1', minLeg: '1/5', freezeN: 4, freezeMin: '6/4', minLead: 0.3, loading: null, error: null, result: null, data: null, dataKey: '' },
   };
 
   function rulesOf(s) { return { best: s.best / 100, longMin: s.longMin / 100, cap: s.cap / 100, includePlayers: s.includePlayers, luckyLong: s.luckyLong, minOdds: s.minOdds }; }
@@ -3343,7 +3912,7 @@ window.TEAMSHEET_VERSION='202611222011';
   function addBtn(leg, label) {
     const k = 'a' + (++addSeq); addReg.set(k, leg);
     const inSlip = state.slip.some((x) => x.id === leg.id);
-    return `<button class="addbtn${inSlip ? ' on' : ''}" data-act="add" data-k="${k}" aria-label="${inSlip ? 'Remove from' : 'Add to'} bet builder: ${esc(leg.label)}">${label || (inSlip ? '✓' : '+')}</button>`;
+    return `<button class="addbtn${inSlip ? ' on' : ''}" data-act="add" data-k="${k}" aria-label="${inSlip ? 'Remove from' : 'Add to'} bet slip: ${esc(leg.label)}">${label || (inSlip ? '✓' : '+')}</button>`;
   }
   function legOf(m) {
     return { id: m.id || (m.fixtureId + ':' + m.label), label: m.label, match: m.match, fixtureId: m.fixtureId, kickoff: m.kickoff, p: m.p, group: m.group, family: m.family, level: m.level,
@@ -3383,11 +3952,11 @@ window.TEAMSHEET_VERSION='202611222011';
   function slipBar() {
     if (!state.slip.length || state.view === 'settings') return '';
     const t = slipTotals();
-    return `<button class="slipbar" data-act="slip-open"><span>Bet builder: ${state.slip.length} selection${state.slip.length === 1 ? '' : 's'}</span><span>${pct(t.p)}${t.dec ? ', ' + esc(frac(t.dec)) : ''}</span></button>`;
+    return `<button class="slipbar" data-act="slip-open"><span>Bet slip: ${state.slip.length} selection${state.slip.length === 1 ? '' : 's'}</span><span>${pct(t.p)}${t.dec ? ', ' + esc(frac(t.dec)) : ''}</span></button>`;
   }
   function viewSlip() {
     const legs = state.slip, t = slipTotals();
-    if (!legs.length) return `<div class="panel"><h2>Bet builder</h2><p class="muted">Tap + next to any pick, player chance or line to add it here.</p><button class="btn secondary wide" data-act="slip-close">Back</button></div>`;
+    if (!legs.length) return `<div class="panel"><h2>Bet slip</h2><p class="muted">Tap + next to any pick, player chance or line to add it here.</p><button class="btn secondary wide" data-act="slip-close">Back</button></div>`;
     const rows = legs.map((l, i) => {
       const d = parseOdds(l.odds);
       const v = d ? l.p * d - 1 : null;
@@ -3398,7 +3967,7 @@ window.TEAMSHEET_VERSION='202611222011';
         ${v != null ? `<div class="small ${v > 0 ? 'value' : 'novalue'}" style="margin-top:4px">${v > 0 ? 'Value: +' + Math.round(v * 100) + '% expected return' : 'No value: the price is shorter than the chance deserves'}</div>` : ''}</div>`;
     }).join('');
     const warn = t.linked ? '<div class="note">Some legs from the same match depend on each other (for example goals and shots). The real chance of all landing differs from the simple product, and bookmakers price bet builders with this in mind, so their combined odds will not match the figure below.</div>' : t.sameMatch ? '<div class="note">Several legs come from the same match. They are treated as independent, which is roughly right for different players and markets.</div>' : '';
-    return `<div class="panel"><div class="row"><h2 class="grow">Bet builder</h2><button class="chip" data-act="slip-close">Close</button></div>
+    return `<div class="panel"><div class="row"><h2 class="grow">Bet slip</h2><button class="chip" data-act="slip-close">Close</button></div>
       <p class="small muted">Type the odds from Sky Bet, Paddy Power or Betfair (fractions like 4/11 or decimals like 1.36) to see whether each leg and the whole bet is good value.</p>
       ${rows}${warn}
       <div class="lucky-total"><div><div>All ${legs.length} win</div><div class="small muted">Fair odds ${esc(frac(t.fairDec))}</div></div><div class="prob">${pct(t.p)}</div></div>
@@ -3451,7 +4020,7 @@ window.TEAMSHEET_VERSION='202611222011';
   }
   function render() {
     const app = $('#app');
-    const nav = ['match', 'day', 'bets', 'settings'].map((v) => `<a href="#${v}" ${state.view === v ? 'aria-current="page"' : ''}>${{ match: 'Match', day: 'Day', bets: 'Bets', settings: 'Settings' }[v]}</a>`).join('');
+    const nav = ['match', 'day', 'build', 'acca', 'bets', 'settings'].map((v) => `<a href="#${v}" ${state.view === v ? 'aria-current="page"' : ''}>${{ match: 'Match', day: 'Day', build: 'Builder', acca: 'Acca', bets: 'Bets', settings: 'Settings' }[v]}</a>`).join('');
     const demo = state.settings.source === 'demo' ? `<div class="demo-band">Demo mode: fictional leagues with simulated data. ${IN_CLAUDE ? 'Real matches need your own copy of the app, because this preview blocks outside data.' : 'Switch the data source to ESPN in Settings for real matches.'}</div>` : '';
     app.innerHTML = `<header class="top" id="topbar"></header>${demo}<main id="main"></main><nav class="tabs" aria-label="Sections">${nav}</nav>`;
     renderTop();
@@ -3461,6 +4030,8 @@ window.TEAMSHEET_VERSION='202611222011';
     else if (state.view === 'match') main.innerHTML = state.match.report ? viewReport(state.match.report) : viewMatchPicker();
     else if (state.view === 'day') main.innerHTML = viewDay();
     else if (state.view === 'bets') main.innerHTML = viewBets();
+    else if (state.view === 'acca') main.innerHTML = viewAcca();
+    else if (state.view === 'build') main.innerHTML = viewBuild();
     else main.innerHTML = viewSettings();
     if (!state.slipOpen) main.insertAdjacentHTML('beforeend', slipBar());
   }
@@ -3707,7 +4278,7 @@ window.TEAMSHEET_VERSION='202611222011';
       return r ? `<tr><td>${l}</td>${cell(r, fam + '-o', l, `Over ${l} ${word}`, po)}${cell(r, fam + '-u', -l, `Under ${l} ${word}`, 1 - po)}</tr>` : `<tr><td>Over ${l}</td><td>${pct(po)}</td><td>${pct(1 - po)}</td></tr>`;
     }).join('');
     return `<div class="panel"><h3>${esc(title)}</h3><p class="small muted">Expected ${f1(t.lh)} for the home side, ${f1(t.la)} for the away side, ${f1(t.lh + t.la)} in total.</p>
-      <p class="small muted">Odds in grey are fair odds from the model's chance; odds in black are bookmaker prices. Tap + to add a line to the bet builder.</p>
+      <p class="small muted">Odds in grey are fair odds from the model's chance; odds in black are bookmaker prices. Tap + to add a line to the bet slip.</p>
       <div class="tbl-wrap"><table><thead><tr><th class="l">Line</th><th>Over</th><th>Under</th></tr></thead><tbody>${rows}</tbody></table></div>${opts.extra || ''}</div>`;
   }
   function teamLines(r, stat, lines, word) {
@@ -3766,7 +4337,7 @@ window.TEAMSHEET_VERSION='202611222011';
     const m = state.match, f = r.fixture, side = m.side;
     const seg = `<div class="seg" role="group"><button data-act="side" data-v="home" aria-pressed="${side === 'home'}">${esc(f.home.name)}</button><button data-act="side" data-v="away" aria-pressed="${side === 'away'}">${esc(f.away.name)}</button></div>`;
     const sq = r.squads[side];
-    const head = (sq.confirmed ? `<p class="small muted">Confirmed team sheet${sq.formation ? ', ' + esc(sq.formation) : ''}. Only these players are used.</p>` : '<p class="small muted">Predicted from recent line-ups. Tap a player\'s name for his last 10 matches.</p>') + '<p class="small muted">Each chance shows fair odds as a fraction. Tap a chance to add it to the bet builder.</p>';
+    const head = (sq.confirmed ? `<p class="small muted">Confirmed team sheet${sq.formation ? ', ' + esc(sq.formation) : ''}. Only these players are used.</p>` : '<p class="small muted">Predicted from recent line-ups. Tap a player\'s name for his last 10 matches.</p>') + '<p class="small muted">Each chance shows fair odds as a fraction. Tap a chance to add it to the bet slip.</p>';
     const rows = r.players[side].map((p) => {
       const P = p.pred, open = m.open.has(p.id);
       const who = `${p.name} (${side === 'home' ? f.home.name : f.away.name})`;
@@ -3971,6 +4542,228 @@ window.TEAMSHEET_VERSION='202611222011';
   }
 
 
+
+  /* ---------- accumulators ---------- */
+  function viewAcca() {
+    const a = state.acca, leagues = leagueList();
+    if (!a.leagues) a.leagues = new Set(leagues.map((l) => l.id));
+    const seg = `<div class="seg" role="group"><button data-act="acca-mode" data-v="win" aria-pressed="${a.mode === 'win'}">Win accumulator</button><button data-act="acca-mode" data-v="freeze" aria-pressed="${a.mode === 'freeze'}">Acca Freeze</button></div>`;
+    const dayChips = [1, 2, 3, 4].map((d) => `<button class="chip" data-act="acca-days" data-v="${d}" aria-pressed="${a.days === d}">${d === 1 ? '1 day' : d + ' days'}</button>`).join('');
+    const lgChips = leagues.map((l) => `<button class="chip" data-act="acca-league" data-id="${l.id}" aria-pressed="${a.leagues.has(l.id)}">${esc(l.name)}</button>`).join('');
+    const sel = (bind, opts, cur) => `<select data-bind="${bind}" id="${bind}">${opts.map(([v, l]) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    let form;
+    if (a.mode === 'win') {
+      const targets = ['2/1', '3/1', '4/1', '5/1', '8/1', '10/1', '20/1', '50/1'].map((t) => `<button class="chip" data-act="acca-target" data-v="${t}" aria-pressed="${a.target === t}">${t}</button>`).join('');
+      form = `<label class="field" for="accaN">Number of teams to win</label>${sel('accaN', [2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map((n) => [n, n + ' teams']), a.n)}
+        <label class="field" for="accaTarget">Odds at least</label><div class="chips" style="flex-wrap:wrap">${targets}</div><input type="text" id="accaTarget" data-bind="accaTarget" value="${esc(a.target)}" placeholder="e.g. 5/1 or 6.0">
+        <label class="field" for="accaMinLeg">Leave out teams priced shorter than</label>${sel('accaMinLeg', [['1/100', 'No limit'], ['1/10', '1/10'], ['1/5', '1/5'], ['1/4', '1/4'], ['1/3', '1/3'], ['1/2', '1/2']], a.minLeg)}`;
+    } else {
+      form = `<label class="field" for="freezeMin">Freeze team priced at least</label>${sel('freezeMin', [['6/5', '6/5'], ['6/4', '6/4'], ['2/1', '2/1'], ['5/2', '5/2'], ['3/1', '3/1'], ['4/1', '4/1']], a.freezeMin)}
+        <label class="field" for="minLead">Freeze team leads at some point in at least</label>${sel('minLead', [[0.2, '20% of matches'], [0.25, '25% of matches'], [0.3, '30% of matches'], [0.35, '35% of matches'], [0.4, '40% of matches'], [0.5, '50% of matches']], a.minLead)}
+        <label class="field" for="freezeN">Other teams to win</label>${sel('freezeN', [[4, '4 teams (5-fold)'], [5, '5 teams (6-fold)'], [6, '6 teams (7-fold)']], a.freezeN)}
+        <label class="field" for="accaMinLeg">Leave out teams priced shorter than</label>${sel('accaMinLeg', [['1/100', 'No limit'], ['1/10', '1/10'], ['1/5', '1/5'], ['1/4', '1/4'], ['1/3', '1/3'], ['1/2', '1/2']], a.minLeg)}
+        <p class="small muted">Sky Bet Acca Freeze works on match result accas of 5 legs or more: when one of your teams is winning you can freeze that leg and it is settled as a winner. The freeze team here is the least likely winner in the acca, a bigger price that still has a real chance of being in front at some point, picked by that chance times its price. The other teams are the strongest favourites. Check Sky Bet's current terms before placing.</p>`;
+    }
+    let body = `<div class="panel">${seg}<label class="field" for="accaStart">Starting</label><input type="date" id="accaStart" data-bind="accaStart" value="${esc(a.start)}">
+      <label class="field">Across</label><div class="chips">${dayChips}</div>
+      <label class="field">Competitions</label><div class="chips" style="flex-wrap:wrap">${lgChips}</div>${form}
+      <button class="btn wide" style="margin-top:12px" data-act="acca-build" ${a.loading ? 'disabled' : ''}>${a.mode === 'win' ? 'Pick my accumulator' : 'Pick my Acca Freeze'}</button>
+      <p class="small muted">Only matches that have not kicked off are used. Each team is picked once at most, one per match.</p></div>`;
+    if (a.error) body += `<div class="error">${esc(a.error)}</div>`;
+    if (a.loading) body += progressBlock(a.loading);
+    else if (a.result) body += a.result.mode === 'win' ? viewWinAcca(a.result) : viewFreeze(a.result);
+    return body;
+  }
+  function accaLegCard(c, role) {
+    const leg = c.market ? legOf(c.market) : null;
+    const price = c.priced ? `<span class="odds">${esc(frac(c.dec))}</span> <span class="muted">${esc(/^median/.test(c.book) ? 'bookmaker' : c.book)}</span>` : `<span class="odds fair">${esc(frac(c.dec))}</span> <span class="muted">estimated</span>`;
+    return `<div class="pick acca-leg${role === 'freeze' ? ' freeze' : ''}"><div class="top-line"><div class="lbl">${role === 'freeze' ? '<span class="badge warn">Freeze</span> ' : ''}${esc(c.team)} to win</div><div class="prob">${pct(c.p)}</div>${leg ? addBtn(leg) : ''}</div>
+      <div class="sub"><span>${c.home ? 'v' : 'at'} ${esc(c.opp)}, ${esc(fmtShort(c.kickoff))} ${fmtTime(c.kickoff)}</span><span>${esc(c.comp || '')}</span><span>${price}</span>${role === 'freeze' ? `<span><b>Leads at some point ${pct(c.pLead)}</b></span>` : ''}</div>
+      <p class="small" style="margin:8px 0 0">${esc(FP.acca.justify(c, role))}</p></div>`;
+  }
+  function accaTotals(r, extra) {
+    return `<div class="lucky-total"><div><div>All ${r.legs.length} win</div><div class="small muted">Fair odds ${esc(frac(1 / r.p))}</div></div><div class="prob">${pct(r.p)}</div></div>
+      <div class="row" style="margin-top:6px"><span class="grow">Combined odds <b>${esc(frac(r.dec))}</b> (${r.dec.toFixed(2)})</span><span class="${r.value > 0 ? 'value' : 'novalue'}">${r.value > 0 ? 'Value +' + Math.round(r.value * 100) + '%' : 'Margin ' + Math.round(-r.value * 100) + '%'}</span></div>
+      ${extra || ''}${r.allPriced ? '' : '<p class="small muted">Some legs have no bookmaker price yet, so their odds are estimated from the model with a typical margin. Prices usually appear a few days before kick-off.</p>'}
+      <div class="row" style="margin-top:10px"><button class="btn grow" data-act="acca-add">Add all to bet slip</button></div>`;
+  }
+  function viewWinAcca(r) {
+    if (!r.ok) return `<div class="empty">${esc(r.reason)}</div>`;
+    const alt = r.alternatives.map((c) => accaLegCard(c)).join('');
+    return `<div class="panel"><h2>Your ${r.legs.length}-team accumulator</h2><p class="small muted">The combination with the highest chance of every team winning while the odds reach ${esc(state.acca.target)}. Higher odds always mean a lower chance, so short-priced favourites make up most of it, with longer prices only where needed to reach the target.</p>
+      ${r.legs.map((c) => accaLegCard(c)).join('')}${accaTotals(r)}</div>
+      ${alt ? `<div class="panel"><h3>Next strongest teams</h3><p class="small muted">Swap one in using + if you prefer. Changing a leg changes the odds and the chance.</p>${alt}</div>` : ''}`;
+  }
+  function viewFreeze(r) {
+    if (!r.ok) return `<div class="empty">${esc(r.reason)}</div>`;
+    const vf = r.valueWithFreeze;
+    const extra = `<div class="lucky-total" style="margin-top:8px;gap:12px"><div><div>With the freeze used</div><div class="small muted">${esc(r.freeze.team)} lead at some point (${pct(r.freeze.pLead)}) and the other ${r.others.length} all win (${pct(r.pOthers)})</div></div><div class="prob">${pct(r.pWithFreeze)}</div></div>
+      <div class="row" style="margin-top:6px"><span class="grow small">At these odds, freezing ${esc(r.freeze.team)} when they go ahead</span><span class="${vf > 0 ? 'value' : 'novalue'}">${vf > 0 ? 'Value +' + Math.round(vf * 100) + '%' : 'Margin ' + Math.round(-vf * 100) + '%'}</span></div>
+      <p class="small muted">Without the freeze all ${r.legs.length} must win, ${pct(r.p)}. The figures assume you freeze ${esc(r.freeze.team)} as soon as they lead and do not spend the freeze on another leg.</p>`;
+    return `<div class="panel"><h2>Your Acca Freeze</h2>${accaLegCard(r.freeze, 'freeze')}<h3 style="margin:12px 0 4px">The other ${r.others.length}</h3>${r.others.map((c) => accaLegCard(c)).join('')}${accaTotals(r, extra)}</div>
+      ${r.alternatives.length ? `<div class="panel"><h3>Other freeze options</h3><p class="small muted">Swap one in using + if you prefer it to the freeze team above.</p>${r.alternatives.map((c) => accaLegCard(c, 'freeze')).join('')}</div>` : ''}`;
+  }
+  async function runAcca() {
+    const a = state.acca;
+    a.loading = 'Starting'; a.error = null; a.result = null; render();
+    try {
+      const target = parseOdds(a.target);
+      if (a.mode === 'win' && !target) throw new Error('Enter the odds you want, for example 5/1');
+      const key = [state.settings.source, a.start, a.days, [...a.leagues].sort().join(',')].join('|');
+      if (!a.data || a.dataKey !== key || Date.now() - a.dataAt > 10 * 60000) {
+        const e = await getEngine();
+        a.data = await e.scanDays(a.start, a.days, [...a.leagues], (msg) => { a.loading = msg; setProgress(msg); });
+        a.dataKey = key; a.dataAt = Date.now();
+      }
+      const cands = FP.acca.candidates(a.data, { now: Date.now() });
+      if (!cands.length) throw new Error('No matches that have not started were found in those days and competitions.');
+      const minLeg = parseOdds(a.minLeg) || 1.01;
+      if (a.mode === 'win') {
+        const r = FP.acca.buildWinAcca(cands, a.n, target, { minLegOdds: minLeg });
+        if (r.ok) { const used = new Set(r.legs.map((c) => c.fixtureId)); r.alternatives = cands.filter((c) => !used.has(c.fixtureId) && c.dec >= minLeg).sort((x, y) => y.p - x.p).slice(0, 5); }
+        a.result = Object.assign({ mode: 'win' }, r);
+      } else {
+        a.result = Object.assign({ mode: 'freeze' }, FP.acca.buildFreeze(cands, a.freezeN, { freezeMinOdds: parseOdds(a.freezeMin), minLegOdds: minLeg, minLead: a.minLead }));
+      }
+    } catch (err) { a.error = err.kind ? friendlyError(err) : err.message; }
+    a.loading = null; render();
+  }
+
+  /* ---------- bet builder generator ---------- */
+  const BB_TARGETS = ['2/1', '3/1', '4/1', '5/1', '8/1', '10/1', '20/1'];
+  const BB_CAT = (c) => (c.player ? (c.m.group || 'Player') : FP.builder.GROUP_NAME[c.key] || c.m.group);
+  const bbAlts = [];
+  function viewBuild() {
+    const B = state.build, leagues = leagueList();
+    if (!leagues.length) return '<div class="empty">Choose your leagues in Settings first.</div>';
+    if (!B.league || !leagues.some((l) => l.id === B.league)) B.league = leagues[0].id;
+    const sel = [...B.selected.values()].sort((a, b) => a.ts - b.ts);
+    const tray = sel.length ? `<div class="bb-tray">${sel.map((f) => `<button class="chip bb-picked" data-act="bb-unpick" data-id="${f.id}" aria-label="Remove ${esc(f.home.name)} v ${esc(f.away.name)}">${esc(f.home.name)} v ${esc(f.away.name)} <span aria-hidden="true">×</span></button>`).join('')}</div>`
+      : '<p class="small muted" style="margin:4px 0 0">Tap one match for a single-game bet builder, or several (up to 6) to combine them.</p>';
+    const chips = leagues.map((l) => `<button class="chip" data-act="bb-league" data-id="${l.id}" aria-pressed="${l.id === B.league}">${esc(l.name)}</button>`).join('');
+    let list = '';
+    if (!B.lists.has(B.league)) loadBuildFixtures(B.league);
+    const L = B.lists.get(B.league);
+    if (!L || L.loading) list = progressBlock('Loading fixtures');
+    else if (L.error) list = `<div class="error">${esc(L.error)}</div>`;
+    else if (!L.list.length) list = '<div class="empty">No matches in the next 10 days for this competition.</div>';
+    else {
+      let lastDay = '';
+      for (const f of L.list) {
+        const day = fmtDay(f.ts);
+        if (day !== lastDay) { list += `<div class="day-head">${esc(day)}</div>`; lastDay = day; }
+        const open = f.status === 'NS' && f.ts > Date.now(), on = B.selected.has(f.id);
+        const tag = D.isLive(f) ? '<span class="tag live">Live</span>' : D.isFinished(f) ? '<span class="tag ft">FT</span>' : !open ? '<span class="tag ft">Started</span>' : `<span class="tick" aria-hidden="true">${on ? '✓' : ''}</span>`;
+        list += `<button class="fx bbfx${on ? ' on' : ''}" data-act="bb-toggle" data-id="${f.id}" aria-pressed="${on}" ${open ? '' : 'disabled'}><span class="ko">${fmtTime(f.ts)}</span><span class="teams"><div>${crest(f.home)} ${esc(f.home.name)}</div><div>${crest(f.away)} ${esc(f.away.name)}</div></span>${tag}</button>`;
+      }
+    }
+    const matchesBody = `<div class="chips" role="group" aria-label="Competition">${chips}</div>${list}`;
+    const pickPanel = `<div class="panel"><h2>1. Matches</h2>${tray}
+      ${B.result && !B.showList ? `<button class="chip bb-more" data-act="bb-showlist" style="margin-top:10px">${sel.length ? 'Change matches' : 'Choose matches'}</button>` : `<div style="margin-top:10px">${matchesBody}</div>`}</div>`;
+    const targets = BB_TARGETS.map((t) => `<button class="chip" data-act="bb-target" data-v="${t}" aria-pressed="${B.target === t}">${t}</button>`).join('');
+    const opt = (bind, opts, cur) => `<select data-bind="${bind}" id="${bind}">${opts.map(([v, l]) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+    const setPanel = `<div class="panel"><h2>2. Target</h2>
+      <label class="field" for="bbTarget">Odds at least</label><div class="chips" style="flex-wrap:wrap">${targets}</div>
+      <input type="text" id="bbTarget" data-bind="bbTarget" value="${esc(B.target)}" placeholder="e.g. 5/1 or 6.0">
+      <div class="row" style="align-items:flex-start"><div class="grow"><label class="field" for="bbMinP">Each selection at least</label>${opt('bbMinP', [[0.55, '55% chance'], [0.6, '60% chance'], [0.65, '65% chance'], [0.7, '70% chance'], [0.75, '75% chance'], [0.8, '80% chance']], B.minP)}</div>
+      <div class="grow"><label class="field" for="bbMaxLegs">Most selections</label>${opt('bbMaxLegs', [4, 5, 6, 8, 10, 12].map((n) => [n, n]), B.maxLegs)}</div></div>
+      <div class="toggle"><input type="checkbox" id="bbPlayers" data-bind="bbPlayers" ${B.players ? 'checked' : ''}><label for="bbPlayers">Include player bets (starting players only)</label></div>
+      <button class="btn wide" style="margin-top:6px" data-act="bb-build" ${sel.length && !B.loading ? '' : 'disabled'}>${sel.length ? `Build for ${sel.length} match${sel.length === 1 ? '' : 'es'}` : 'Choose a match first'}</button></div>`;
+    let out = '';
+    if (B.error) out += `<div class="error">${esc(B.error)}</div>`;
+    if (B.loading) out += progressBlock(B.loading);
+    else if (B.result) out += viewBuildResult(B.result);
+    return pickPanel + setPanel + out;
+  }
+  async function loadBuildFixtures(league) {
+    const B = state.build;
+    B.lists.set(league, { loading: true, list: [] });
+    try { const e = await getEngine(); const r = await e.upcoming(league, 10); B.lists.set(league, { list: r.list }); }
+    catch (err) { B.lists.set(league, { list: [], error: friendlyError(err) }); }
+    if (state.view === 'build') { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  }
+  function viewBuildResult(R) {
+    const B = state.build;
+    let h = '';
+    if (R.skipped.length) h += `<div class="note">${R.skipped.map((s) => `${esc(s.fixture.home.name)} v ${esc(s.fixture.away.name)} ${esc(s.reason)}, so it was left out.`).join(' ')}</div>`;
+    const bs = R.builders;
+    if (!bs.length || !bs[0].ok) return h + `<div class="empty">${esc((bs[0] && bs[0].reason) || 'No bet builder could be made.')}</div>`;
+    if (B.active >= bs.length) B.active = 0;
+    h += `<div class="bb-switch" role="tablist">${bs.map((b, i) => `<button role="tab" data-act="bb-tab" data-v="${i}" aria-selected="${B.active === i}"><span class="n">Builder ${i + 1}</span><span class="s">${b.ok ? `${esc(frac(b.dec))}, ${pct(b.p)}` : 'none found'}</span></button>`).join('')}</div>`;
+    const b = bs[B.active];
+    h += b.ok ? ticket(b, B.active, R) : `<div class="empty">${esc(b.reason)}</div>`;
+    const lineups = R.prep.fixtureIds.map((fid) => R.prep.ctxs.get(fid));
+    const pending = lineups.filter((c) => !c.confirmed);
+    h += `<div class="panel small">${pending.length ? `<p style="margin-top:0"><b>Team news.</b> ${pending.length === lineups.length ? 'No team sheets are out yet' : 'Some team sheets are not out yet'}, so player selections only use players very likely to start (80% or more). Rebuild about an hour before kick-off to use the confirmed starting XI only.</p>` : '<p style="margin-top:0"><b>Team news.</b> Team sheets are confirmed for every match, so player selections only use the starting XI.</p>'}
+      <p>Prices marked <i>est.</i> have no bookmaker price on ESPN, so they are the model's chance with a typical 8% bet builder margin. Selections from the same match that depend on each other (for example a team win and over 1.5 goals) are priced together from the score model, as bookmakers do. Sky Bet's bet builder price will still differ: check it before placing.</p>
+      <button class="btn secondary wide" data-act="bb-rebuild">Rebuild with the latest team news</button></div>`;
+    return h;
+  }
+  function ticket(b, bi, R) {
+    const B = state.build, target = R.opts.target;
+    const byFx = new Map();
+    b.legs.forEach((c, i) => { if (!byFx.has(c.fixtureId)) byFx.set(c.fixtureId, []); byFx.get(c.fixtureId).push([c, i]); });
+    let body = '';
+    for (const [fid, legs] of byFx) {
+      const ctx = R.prep.ctxs.get(fid), f = ctx.fixture;
+      body += `<div class="tk-match"><div class="grow"><b>${esc(f.home.name)} v ${esc(f.away.name)}</b><div class="small muted">${esc(fmtShort(f.ts))} ${fmtTime(f.ts)}, ${esc(f.compName || '')}</div></div><span class="badge ${ctx.confirmed ? 'ok' : 'warn'}">${ctx.confirmed ? 'Starting XI out' : 'Predicted XI'}</span></div>`;
+      for (const [c, i] of legs) {
+        const open = B.swap && B.swap.b === bi && B.swap.i === i;
+        body += `<div class="tk-leg k-${c.player ? 'player' : c.key}${open ? ' open' : ''}"><div class="grow"><div class="tk-cat">${esc(BB_CAT(c))}</div><div class="tk-lbl">${esc(c.m.label)}</div><div class="tk-why">${esc(FP.builder.justify(c, R.prep))}</div></div>
+          <div class="tk-side"><div class="tk-p">${pct(c.p)}</div><div class="tk-price">${esc(frac(c.dec))}${c.priced ? '' : ' <i>est.</i>'}</div><button class="tk-swap" data-act="bb-swap" data-b="${bi}" data-i="${i}" aria-expanded="${open}">${open ? 'Close' : 'Swap'}</button></div></div>`;
+        if (open) body += swapPanel(b, bi, i, R);
+      }
+    }
+    const short = !b.meets;
+    return `<article class="ticket">
+      <header class="tk-head"><div><div class="tk-name">Builder ${bi + 1}</div><div class="tk-sub">${bi === 0 ? 'Highest chance of landing' : 'A different set of selections'}${b.edited ? ', edited' : ''}</div></div>
+        <div class="tk-odds"><div class="big">${esc(frac(b.dec))}</div><div class="small">${b.dec.toFixed(2)}, ${pct(b.p)} chance</div></div></header>
+      <div class="tk-body">${body}</div>
+      <div class="tk-perf" aria-hidden="true"></div>
+      <footer class="tk-foot">
+        <div class="tk-row"><span>${b.legs.length} selections all land</span><b>${pct(b.p)}</b></div>
+        <div class="tk-row"><span>Estimated combined odds</span><b>${esc(frac(b.dec))} <span class="muted">(${b.dec.toFixed(2)})</span></b></div>
+        <div class="tk-row"><span>Fair odds from the model</span><b>${esc(frac(1 / b.p))}</b></div>
+        ${short ? `<div class="note" style="margin:8px 0 0">After your changes this is below your target of ${esc(frac(target))}.</div>` : ''}
+        <div class="row" style="margin-top:12px"><button class="btn grow" data-act="bb-add" data-b="${bi}">Add to bet slip</button></div>
+      </footer></article>`;
+  }
+  function swapPanel(b, bi, i, R) {
+    const alts = FP.builder.swapOptions(b, i, R.prep, R.opts, 6);
+    bbAlts.length = 0;
+    const rows = alts.map((a, k) => { bbAlts.push(a.c); return `<button class="tk-alt${a.meets ? '' : ' short'}" data-act="bb-swap-pick" data-b="${bi}" data-i="${i}" data-k="${k}">
+      <span class="grow"><span class="tk-cat">${esc(BB_CAT(a.c))}</span><b>${esc(a.c.m.label)}</b><span class="small muted">${pct(a.c.p)}, ${esc(frac(a.c.dec))}${a.c.priced ? '' : ' est.'}</span></span>
+      <span class="tk-res"><b>${esc(frac(a.dec))}</b><span class="small">${pct(a.p)} ${a.meets ? '' : '(below target)'}</span></span></button>`; }).join('');
+    return `<div class="tk-swaps"><div class="small muted">Swap for another selection from this match. Right-hand figures show the whole builder after the swap.</div>${rows || '<p class="small">No other selection from this match fits.</p>'}
+      <div class="row" style="margin-top:8px">${b.legs.length > 2 ? `<button class="btn secondary grow" data-act="bb-remove" data-b="${bi}" data-i="${i}">Remove this selection</button>` : ''}<button class="btn secondary grow" data-act="bb-swap" data-b="${bi}" data-i="${i}">Cancel</button></div></div>`;
+  }
+  async function runBuild(force) {
+    const B = state.build;
+    const target = parseOdds(B.target);
+    if (!target) { B.error = 'Enter the odds you want, for example 5/1'; render(); return; }
+    B.loading = 'Starting'; B.error = null; B.result = null; B.swap = null; render();
+    try {
+      const e = await getEngine();
+      const sel = [...B.selected.values()].sort((a, b) => a.ts - b.ts);
+      const reps = [];
+      for (let i = 0; i < sel.length; i++) {
+        const f = sel[i], c = B.reports.get(f.id);
+        if (!force && c && Date.now() - c.at < 10 * 60000) { reps.push(c.rep); continue; }
+        const head = `${f.home.name} v ${f.away.name}${sel.length > 1 ? ` (${i + 1} of ${sel.length})` : ''}`;
+        const rep = await e.analyseFixture(f.id, (msg) => { B.loading = `${head}: ${msg}`; setProgress(B.loading); });
+        B.reports.set(f.id, { rep, at: Date.now() });
+        reps.push(rep);
+      }
+      B.loading = 'Picking selections'; setProgress(B.loading);
+      await new Promise((r) => setTimeout(r, 0));
+      const opts = { target, minLegP: B.minP, maxLegs: B.maxLegs, includePlayers: B.players, now: Date.now() };
+      B.result = Object.assign(FP.builder.buildTwo(reps, opts), { opts });
+      B.active = 0; B.showList = false;
+    } catch (err) { B.error = err.kind ? friendlyError(err) : err.message; }
+    B.loading = null; render(); refreshStatus();
+    const t = document.querySelector('.bb-switch'); if (t) t.scrollIntoView({ block: 'start' });
+  }
+
   /* ---------- bet tracker ---------- */
   const pctPlain = (p) => (p == null || !isFinite(p) ? '–' : Math.round(p * 100) + '%');
   const money = (x) => (x == null || !isFinite(x) ? '–' : (x < 0 ? '-£' : '£') + Math.abs(x).toFixed(2));
@@ -4020,7 +4813,7 @@ window.TEAMSHEET_VERSION='202611222011';
     const bets = state.bets;
     const s = T.summary(bets, since), c = T.calibration(bets, since);
     const per = [['all', 'All time'], ['month', 'This month'], ['week', 'Last 7 days']].map(([k, l]) => `<button class="chip" data-act="bets-period" data-v="${k}" aria-pressed="${ui.period === k}">${l}</button>`).join('');
-    if (!bets.length) return `<div class="panel"><h2>Your bets</h2><p>No bets logged yet.</p><p class="small muted">Add selections to the bet builder, open it, and use <b>Log this bet</b> once you have placed it with your bookmaker. The app settles each bet from the result and tracks your profit and loss, and how often the model's chances come in.</p></div>${backupPanel()}`;
+    if (!bets.length) return `<div class="panel"><h2>Your bets</h2><p>No bets logged yet.</p><p class="small muted">Add selections to the bet slip, open it, and use <b>Log this bet</b> once you have placed it with your bookmaker. The app settles each bet from the result and tracks your profit and loss, and how often the model's chances come in.</p></div>${backupPanel()}`;
     const head = `<div class="panel"><h2>Your bets</h2><div class="chips">${per}</div>
       <div class="kpis"><div><span class="small muted">Profit</span><b class="${s.profit >= 0 ? 'value' : 'res-lost'}">${money(s.profit)}</b></div><div><span class="small muted">Return on stakes</span><b>${s.roi == null ? '–' : (s.roi >= 0 ? '+' : '') + Math.round(s.roi * 100) + '%'}</b></div><div><span class="small muted">Won</span><b>${s.won} of ${s.won + s.lost}</b></div></div>
       <p class="small muted">Settled: ${money(s.staked)} staked, ${money(s.returned)} returned${s.void ? `, ${s.void} void` : ''}. Open: ${s.open} bet${s.open === 1 ? '' : 's'}, ${money(s.openStake)} staked.${ui.busy ? ' Checking results…' : ''}</p>
@@ -4069,7 +4862,7 @@ window.TEAMSHEET_VERSION='202611222011';
       case 'rtab': m.tab = v; render(); if ((v === 'live' || v === 'liveplayers') && (!m.live || Date.now() - (m.liveAt || 0) > 55000)) refreshLive(); break;
       case 'lside': m.liveSide = v; render(); break;
       case 'live-refresh': refreshLive(); break;
-      case 'add': { const leg = addReg.get(b.dataset.k); if (!leg) break; const added = toggleLeg(leg); toast(added ? 'Added to bet builder' : 'Removed from bet builder'); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
+      case 'add': { const leg = addReg.get(b.dataset.k); if (!leg) break; const added = toggleLeg(leg); toast(added ? 'Added to bet slip' : 'Removed from bet slip'); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
       case 'log-bet': {
         const stake = parseFloat(($('#log-stake') || {}).value);
         const odds = parseOdds(($('#log-odds') || {}).value);
@@ -4084,6 +4877,57 @@ window.TEAMSHEET_VERSION='202611222011';
         state.betsUi.keep = keep;
         if (!keep) { state.slip = []; saveSlip(); }
         state.slipOpen = false; toast('Bet logged'); location.hash = 'bets'; render();
+        break;
+      }
+      case 'acca-mode': state.acca.mode = v; state.acca.result = null; render(); break;
+      case 'acca-days': state.acca.days = +v; render(); break;
+      case 'acca-league': { const k = +id, L = state.acca.leagues; if (L.has(k)) L.delete(k); else L.add(k); render(); break; }
+      case 'acca-target': state.acca.target = v; render(); break;
+      case 'acca-build': runAcca(); break;
+      case 'acca-add': {
+        const r = state.acca.result; if (!r || !r.ok) break;
+        let n = 0;
+        for (const c of r.legs) if (c.market) { const leg = legOf(c.market); if (!state.slip.some((x) => x.id === leg.id)) { state.slip.push(leg); n++; } }
+        saveSlip(); toast(`Added ${n} selection${n === 1 ? '' : 's'} to the bet slip`); const y = window.scrollY; render(); window.scrollTo(0, y);
+        break;
+      }
+      case 'bb-league': state.build.league = +id; render(); break;
+      case 'bb-showlist': state.build.showList = true; render(); break;
+      case 'bb-toggle': {
+        const B = state.build, L = B.lists.get(B.league), f = L && L.list.find((x) => String(x.id) === String(id));
+        if (!f) break;
+        if (B.selected.has(f.id)) B.selected.delete(f.id);
+        else if (B.selected.size >= 6) { toast('Up to 6 matches'); break; }
+        else B.selected.set(f.id, f);
+        const y = window.scrollY; render(); window.scrollTo(0, y); break;
+      }
+      case 'bb-unpick': { const B = state.build; for (const k of B.selected.keys()) if (String(k) === String(id)) B.selected.delete(k); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
+      case 'bb-target': state.build.target = v; render(); break;
+      case 'bb-build': runBuild(false); break;
+      case 'bb-rebuild': runBuild(true); break;
+      case 'bb-tab': state.build.active = +v; state.build.swap = null; render(); break;
+      case 'bb-swap': {
+        const B = state.build, bi = +b.dataset.b, i = +b.dataset.i;
+        B.swap = B.swap && B.swap.b === bi && B.swap.i === i ? null : { b: bi, i };
+        const y = window.scrollY; render(); window.scrollTo(0, y); break;
+      }
+      case 'bb-swap-pick': {
+        const B = state.build, R = B.result, bi = +b.dataset.b, i = +b.dataset.i, c = bbAlts[+b.dataset.k];
+        if (!R || !c) break;
+        R.builders[bi] = Object.assign(FP.builder.applySwap(R.builders[bi], i, c, R.prep, R.opts), { edited: true });
+        B.swap = null; toast('Swapped'); const y = window.scrollY; render(); window.scrollTo(0, y); break;
+      }
+      case 'bb-remove': {
+        const B = state.build, R = B.result, bi = +b.dataset.b, i = +b.dataset.i;
+        const nb = R && FP.builder.removeLeg(R.builders[bi], i, R.prep, R.opts);
+        if (!nb) break;
+        R.builders[bi] = Object.assign(nb, { edited: true }); B.swap = null; toast('Removed'); const y = window.scrollY; render(); window.scrollTo(0, y); break;
+      }
+      case 'bb-add': {
+        const R = state.build.result, bb = R && R.builders[+b.dataset.b]; if (!bb || !bb.ok) break;
+        let n = 0;
+        for (const c of bb.legs) { const leg = legOf(c.m); if (!state.slip.some((x) => x.id === leg.id)) { state.slip.push(leg); n++; } }
+        saveSlip(); toast(`Added ${n} selection${n === 1 ? '' : 's'} to the bet slip. Enter Sky Bet's bet builder price when you log it.`); const y = window.scrollY; render(); window.scrollTo(0, y);
         break;
       }
       case 'bets-period': state.betsUi.period = v; render(); break;
@@ -4185,6 +5029,16 @@ window.TEAMSHEET_VERSION='202611222011';
     const el = ev.target, bind = el.dataset && el.dataset.bind;
     if (!bind) return;
     const s = state.settings;
+    if (bind === 'accaN' || bind === 'freezeN') { state.acca[bind === 'accaN' ? 'n' : 'freezeN'] = +el.value; return; }
+    if (bind === 'bbTarget') { state.build.target = el.value.trim(); render(); return; }
+    if (bind === 'bbMinP') { state.build.minP = +el.value; return; }
+    if (bind === 'bbMaxLegs') { state.build.maxLegs = +el.value; return; }
+    if (bind === 'bbPlayers') { state.build.players = el.checked; return; }
+    if (bind === 'accaTarget') { state.acca.target = el.value.trim(); render(); return; }
+    if (bind === 'accaMinLeg') { state.acca.minLeg = el.value; return; }
+    if (bind === 'freezeMin') { state.acca.freezeMin = el.value; return; }
+    if (bind === 'minLead') { state.acca.minLead = +el.value; return; }
+    if (bind === 'accaStart') { state.acca.start = el.value; return; }
     if (bind === 'legOdds') { const l = state.slip[+el.dataset.i]; if (l) { l.odds = el.value.trim(); saveSlip(); render(); } return; }
     if (bind === 'home' || bind === 'away') { state.match[bind] = el.value; render(); return; }
     if (bind === 'date') { state.day.date = el.value; return; }
@@ -4208,10 +5062,12 @@ window.TEAMSHEET_VERSION='202611222011';
     engine = null; state.status = null; state.statusErr = null;
     Object.assign(state.match, { league: null, list: null, teams: null, report: null, error: null });
     Object.assign(state.day, { report: null, leagues: null, error: null });
+    Object.assign(state.acca, { result: null, data: null, leagues: null, error: null });
+    Object.assign(state.build, { lists: new Map(), selected: new Map(), reports: new Map(), result: null, error: null, swap: null });
   }
   function route() {
     const h = (location.hash || '#match').slice(1);
-    state.view = ['match', 'day', 'bets', 'settings'].includes(h) ? h : 'match';
+    state.view = ['match', 'day', 'build', 'acca', 'bets', 'settings'].includes(h) ? h : 'match';
     if (state.view === 'bets') setTimeout(autoSettle, 0);
     state.slipOpen = false;
     if (state.view === 'settings') storageState.info = null;

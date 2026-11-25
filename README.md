@@ -16,14 +16,6 @@ Football match and player predictions on your phone. Data comes free from ESPN's
 - With confirmed line-ups, each player's fouls are nudged by his direct opponent's habits (for example a full-back facing a winger who is fouled a lot).
 - Where ESPN carries odds (DraftKings match result and total goals), picks show the price and a Value flag when the model's probability beats it.
 
-## Put it on your Android phone (GitHub Pages, free)
-
-1. On your phone, sign in to github.com (create a free account if needed).
-2. Tap **+**, then **New repository**. Name it `teamsheet`, set it to **Public**, tick **Add a README file**, then **Create repository**.
-3. In the repository tap **Add file**, then **Upload files**, and choose `index.html`, `manifest.webmanifest`, `sw.js`, `icon-192.png` and `icon-512.png`. Tap **Commit changes**.
-4. Open the repository's **Settings**, then **Pages**. Under **Branch** choose `main` and `/ (root)`, then **Save**.
-5. After a minute or two the site is live at `https://YOUR-USERNAME.github.io/teamsheet/`. Open it in Chrome, tap the menu, then **Add to Home screen**.
-6. Open the app. It starts on ESPN data straight away; there is nothing to set up.
 
 ## Data use
 

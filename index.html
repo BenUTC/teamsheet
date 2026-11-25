@@ -249,12 +249,22 @@ nav.tabs a { font-size: 0.9rem; }
 .tk-foot { padding: 12px 14px 14px; }
 .tk-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
 .tk-row b { font-family: var(--display); font-size: 1.1rem; }
+
+.tk-link { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #EDE6F6; color: #5B3A8E; font-size: 0.72rem; font-weight: 600; }
+.pc { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pc input { margin-bottom: 6px; }
+.pc-verdict { font-size: 0.88rem; padding: 8px 10px; border-radius: 8px; border-left: 4px solid var(--line); background: var(--paper); }
+.pc-value { border-left-color: var(--pitch); background: var(--pitch-2); }
+.pc-fair { border-left-color: var(--pitch); }
+.pc-margin { border-left-color: var(--yellow); }
+.pc-poor { border-left-color: var(--red); }
+.bb-cost { align-items: center; padding: 9px 0; border-top: 1px solid var(--line); gap: 10px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-window.TEAMSHEET_VERSION='202611241948';
+window.TEAMSHEET_VERSION='202611251312';
 /* ===== stats.js ===== */
 /* Probability engine: count distributions, joint team-stat model, Dixon-Coles score matrix. */
 (function (root) {
@@ -3492,6 +3502,207 @@ window.TEAMSHEET_VERSION='202611241948';
   FP.acca = { scoreFirst, leadsAtSomePoint, candidates, buildWinAcca, buildFreeze, totals, justify, EST_MARGIN };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
+/* ===== bbsim.js ===== */
+/* Whole-match simulation for bet builders. Every selection keeps its own chance from the models; how the
+   selections move together comes from a Gaussian copula whose correlations were measured on 3,057 matches
+   (big five leagues and the Championship, 2025/26 and 2026/27 to date; backtest/bb_corr.js). For a team stat
+   the home count is drawn from its marginal and the away count from the exact conditional, so the existing
+   home/away grid (goals, corners, cards, shots, shots on target) is kept. Matches are independent of each other. */
+(function (root) {
+  'use strict';
+  const FP = (root.FP = root.FP || {});
+  const S = FP.stats;
+
+  // latent correlations between residuals (what happened minus what was expected), corrected for whole numbers
+  // player links scaled by 1.5: player expectations are noisier, which dilutes the measured correlation, and the
+  // backtest on 425 matches (backtest/bb_backtest.js) priced pairs of selections best with this scaling
+  let CORR = {
+    "P:card|T:cards|same":0.567,
+    "P:fc|P:fd|opp":0.117,
+    "P:fc|T:cards|same":0.167,
+    "P:fd|T:cards|opp":0.141,
+    "P:goals|T:goals|same":0.746,
+    "P:goals|T:sot|same":0.314,
+    "P:saves|P:saves|opp":-0.161,
+    "P:saves|P:shots|opp":0.276,
+    "P:saves|P:shots|same":-0.117,
+    "P:saves|P:sot|opp":0.456,
+    "P:saves|T:cards|same":0.101,
+    "P:saves|T:corners|opp":0.467,
+    "P:saves|T:corners|same":-0.225,
+    "P:saves|T:shots|opp":0.853,
+    "P:saves|T:shots|same":-0.271,
+    "P:saves|T:sot|opp":0.95,
+    "P:saves|T:sot|same":-0.147,
+    "P:shots|P:shots|same":0.109,
+    "P:shots|T:corners|opp":-0.141,
+    "P:shots|T:corners|same":0.295,
+    "P:shots|T:goals|same":0.106,
+    "P:shots|T:shots|opp":-0.18,
+    "P:shots|T:shots|same":0.572,
+    "P:shots|T:sot|opp":-0.087,
+    "P:shots|T:sot|same":0.333,
+    "P:sot|T:corners|same":0.132,
+    "P:sot|T:goals|same":0.324,
+    "P:sot|T:shots|same":0.3,
+    "P:sot|T:sot|same":0.569,
+    "T:cards|T:corners|same":-0.059,
+    "T:cards|T:goals|opp":0.055,
+    "T:cards|T:shots|opp":0.085,
+    "T:cards|T:shots|same":-0.097,
+    "T:cards|T:sot|opp":0.068,
+    "T:cards|T:sot|same":-0.055,
+    "T:corners|T:goals|opp":0.067,
+    "T:corners|T:goals|same":-0.091,
+    "T:corners|T:shots|opp":-0.272,
+    "T:corners|T:shots|same":0.491,
+    "T:corners|T:sot|opp":-0.12,
+    "T:corners|T:sot|same":0.228,
+    "T:goals|T:cards|opp":0.051,
+    "T:goals|T:corners|opp":0.059,
+    "T:goals|T:shots|same":0.178,
+    "T:goals|T:sot|same":0.551,
+    "T:shots|T:cards|opp":0.085,
+    "T:shots|T:corners|opp":-0.259,
+    "T:shots|T:sot|opp":-0.163,
+    "T:shots|T:sot|same":0.618,
+    "T:sot|T:cards|opp":0.068,
+    "T:sot|T:corners|opp":-0.103,
+    "T:sot|T:shots|opp":-0.164
+  };
+
+  const PSTAT = { fc: 'fc', fd: 'fd', shots: 'shots', sot: 'sot', goal: 'goals', saves: 'saves', card: 'card' };
+  function look(name) { const v = CORR[name]; return v == null ? null : v; }
+  function corrOf(a, b) {
+    const rel = a.side === b.side ? 'same' : 'opp';
+    if (a.kind === 'T' && b.kind === 'T') {
+      if (a.stat === b.stat) return 0; // kept exactly by the home/away grid
+      if (rel === 'same') { const [x, y] = a.stat < b.stat ? [a.stat, b.stat] : [b.stat, a.stat]; return look(`T:${x}|T:${y}|same`) || 0; }
+      const u = look(`T:${a.stat}|T:${b.stat}|opp`), v = look(`T:${b.stat}|T:${a.stat}|opp`);
+      return u != null && v != null ? (u + v) / 2 : u != null ? u : v != null ? v : 0;
+    }
+    if (a.kind === 'T') return corrOf(b, a);
+    if (b.kind === 'T') return look(`P:${a.stat}|T:${b.stat}|${rel}`) || 0;
+    if (a.pid === b.pid) return 0.5; // one leg per player in a builder, so this is not normally used
+    const [x, y] = a.stat <= b.stat ? [a.stat, b.stat] : [b.stat, a.stat];
+    return look(`P:${x}|P:${y}|${rel}`) || 0;
+  }
+
+  /* ---------- small linear algebra ---------- */
+  function jacobi(A) { // symmetric eigen decomposition
+    const n = A.length, a = A.map((r) => r.slice()), v = A.map((_, i) => A.map((__, j) => (i === j ? 1 : 0)));
+    for (let sweep = 0; sweep < 60; sweep++) {
+      let off = 0;
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i][j] * a[i][j];
+      if (off < 1e-14) break;
+      for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
+        if (Math.abs(a[p][q]) < 1e-15) continue;
+        const th = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+        const t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let k = 0; k < n; k++) { const akp = a[k][p], akq = a[k][q]; a[k][p] = c * akp - s * akq; a[k][q] = s * akp + c * akq; }
+        for (let k = 0; k < n; k++) { const apk = a[p][k], aqk = a[q][k]; a[p][k] = c * apk - s * aqk; a[q][k] = s * apk + c * aqk; }
+        for (let k = 0; k < n; k++) { const vkp = v[k][p], vkq = v[k][q]; v[k][p] = c * vkp - s * vkq; v[k][q] = s * vkp + c * vkq; }
+      }
+    }
+    return { values: a.map((r, i) => r[i]), vectors: v };
+  }
+  // nearest valid correlation matrix: clip eigenvalues, rescale to a unit diagonal
+  function fixPD(R) {
+    const n = R.length;
+    const { values, vectors } = jacobi(R);
+    if (Math.min(...values) > 1e-6) return R;
+    const lam = values.map((x) => Math.max(x, 1e-4));
+    const B = R.map((_, i) => R.map((__, j) => { let s = 0; for (let k = 0; k < n; k++) s += vectors[i][k] * lam[k] * vectors[j][k]; return s; }));
+    return B.map((r, i) => r.map((x, j) => (i === j ? 1 : x / Math.sqrt(B[i][i] * B[j][j]))));
+  }
+  function cholesky(R) {
+    const n = R.length, L = R.map(() => new Float64Array(n));
+    for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
+      let s = R[i][j];
+      for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+      L[i][j] = i === j ? Math.sqrt(Math.max(s, 1e-12)) : s / L[j][j];
+    }
+    return L;
+  }
+
+  /* ---------- random numbers (fixed seed: the same builder always gives the same answer) ---------- */
+  function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function normals(N, d, seed) {
+    const r = rng(seed), out = new Float64Array(N * d);
+    for (let i = 0; i < out.length; i += 2) {
+      let u = 0; while (!u) u = r();
+      const v = r(), m = Math.sqrt(-2 * Math.log(u));
+      out[i] = m * Math.cos(2 * Math.PI * v); if (i + 1 < out.length) out[i + 1] = m * Math.sin(2 * Math.PI * v);
+    }
+    return out;
+  }
+  const Phi = (z) => 0.5 * (1 + erf(z / Math.SQRT2));
+  function erf(x) { const t = 1 / (1 + 0.3275911 * Math.abs(x)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; }
+  const cdfOf = (pmf) => { const c = new Float64Array(pmf.length); let s = 0; for (let i = 0; i < pmf.length; i++) { s += pmf[i]; c[i] = s; } for (let i = 0; i < c.length; i++) c[i] /= s || 1; return c; };
+  function inv(c, u) { let lo = 0, hi = c.length - 1; while (lo < hi) { const mid = (lo + hi) >> 1; if (c[mid] >= u) hi = mid; else lo = mid + 1; } return lo; }
+
+  /* ---------- one match ---------- */
+  // legs: builder candidates from one match (with .spec for team legs, .player and .side for player legs)
+  function matchProb(legs, ctx, N, seed) {
+    const qs = [], idx = new Map();
+    const addQ = (key, q) => { if (!idx.has(key)) { idx.set(key, qs.length); qs.push(q); } return idx.get(key); };
+    const tests = [];
+    for (const c of legs) {
+      if (c.spec) {
+        const J = ctx.joints[c.spec.stat];
+        const h = addQ('T:' + c.spec.stat + ':h', { kind: 'T', stat: c.spec.stat, side: 'h', J });
+        const a = addQ('T:' + c.spec.stat + ':a', { kind: 'T', stat: c.spec.stat, side: 'a', J, cond: h });
+        tests.push((x) => c.spec.test(x[h], x[a]));
+      } else {
+        const mm = c.m.family.match(/^p-([a-z]+)-/), st = PSTAT[mm[1]], lv = c.m.level || 1;
+        let pmf;
+        if (st === 'card') { const p = c.player.pred.card.p; pmf = [1 - p, p]; }
+        else pmf = c.player.pred[st === 'goals' ? 'goals' : st].pmf;
+        const k = addQ('P:' + st + ':' + c.player.id, { kind: 'P', stat: st, side: c.side, pid: c.player.id, cdf: cdfOf(pmf) });
+        tests.push((x) => x[k] >= lv);
+      }
+    }
+    const d = qs.length;
+    // marginal and conditional cdfs for team stats
+    for (const q of qs) if (q.kind === 'T') {
+      if (q.side === 'h') q.cdf = cdfOf(q.J.map((row) => row.reduce((s, v) => s + v, 0)));
+      else q.conds = q.J.map((row) => cdfOf(row));
+    }
+    const R = qs.map((a, i) => qs.map((b, j) => (i === j ? 1 : corrOf(a, b))));
+    const L = cholesky(fixPD(R));
+    const Z = normals(N, d, seed);
+    const x = new Int32Array(d), z = new Float64Array(d);
+    let hit = 0;
+    for (let n = 0; n < N; n++) {
+      const off = n * d;
+      for (let i = 0; i < d; i++) { let s = 0; const Li = L[i]; for (let k = 0; k <= i; k++) s += Li[k] * Z[off + k]; z[i] = s; }
+      for (let i = 0; i < d; i++) { const q = qs[i]; if (q.kind === 'P' || q.side === 'h') x[i] = inv(q.cdf, Phi(z[i])); }
+      for (let i = 0; i < d; i++) { const q = qs[i]; if (q.kind === 'T' && q.side === 'a') { const c = q.conds[Math.min(x[q.cond], q.conds.length - 1)]; x[i] = inv(c, Phi(z[i])); } }
+      let ok = true;
+      for (let t = 0; t < tests.length; t++) if (!tests[t](x)) { ok = false; break; }
+      if (ok) hit++;
+    }
+    return { p: hit / N, n: N, quantities: d };
+  }
+
+  /* Chance that every leg lands, matches independent of each other. */
+  function builderProb(legs, ctxs, opts) {
+    opts = opts || {};
+    const N = opts.N || 20000;
+    const by = new Map();
+    for (const c of legs) { if (!by.has(c.fixtureId)) by.set(c.fixtureId, []); by.get(c.fixtureId).push(c); }
+    let p = 1;
+    for (const [fid, ls] of by) {
+      if (ls.length === 1) { p *= ls[0].p; continue; }
+      const seed = 9001 + (String(fid).split('').reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7) % 100000);
+      p *= matchProb(ls, ctxs.get(fid), N, seed).p;
+    }
+    return p;
+  }
+
+  FP.bbsim = { get CORR() { return CORR; }, setCorr(c) { CORR = c; }, corrOf, fixPD, cholesky, jacobi, matchProb, builderProb };
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
 /* ===== builder.js ===== */
 /* Bet builder generator: from one or more analysed matches, pick likely events whose combined odds reach a target,
    with the highest chance of every leg landing. Legs from the same team market (goals and result, corners, cards,
@@ -3532,11 +3743,12 @@ window.TEAMSHEET_VERSION='202611241948';
     const fx = rep.fixture, confirmed = rep.lineupStatus === 'confirmed';
     const ctx = { fixture: fx, joints: {}, rep, confirmed };
     for (const st of ['goals', 'corners', 'cards', 'sot', 'shots']) if (rep.team[st]) ctx.joints[st] = rep.team[st].joint;
-    const players = new Map();
-    for (const side of ['home', 'away']) for (const p of rep.players[side] || []) players.set(String(p.id), p);
+    const players = new Map(), sideOf = new Map();
+    for (const side of ['home', 'away']) for (const p of rep.players[side] || []) { players.set(String(p.id), p); sideOf.set(String(p.id), side === 'home' ? 'h' : 'a'); }
     const out = [];
     for (const m of rep.markets) {
-      if (!(m.p >= minP && m.p <= maxP)) continue;
+      // must-include types may fall back to 50% when nothing reaches the minimum; those are marked low
+      if (!(m.p >= Math.min(minP, 0.5) && m.p <= maxP)) continue;
       let key, spec = null, pl = null;
       if (m.isPlayer) {
         if (opts.includePlayers === false) continue;
@@ -3553,7 +3765,7 @@ window.TEAMSHEET_VERSION='202611241948';
       const priced = !!m.price;
       const dec = priced ? m.price : Math.max(1.01, +(1 / (m.p * (1 + BB_MARGIN))).toFixed(3));
       if (dec < minDec) continue;
-      out.push({ id: m.id, m, fixtureId: fx.id, key, gkey: fx.id + '|' + key, spec, player: pl, p: m.p, dec, priced, book: priced ? m.priceBook : null, starter: pl ? (confirmed ? 'confirmed' : 'predicted') : null });
+      out.push({ id: m.id, m, fixtureId: fx.id, key, gkey: fx.id + '|' + key, spec, player: pl, side: pl ? sideOf.get(String(m.playerId)) : null, p: m.p, dec, priced, book: priced ? m.priceBook : null, starter: pl ? (confirmed ? 'confirmed' : 'predicted') : null, low: m.p < minP });
     }
     return { ctx, cands: out };
   }
@@ -3576,24 +3788,30 @@ window.TEAMSHEET_VERSION='202611241948';
     if (legs.length === 2 && legs[0].spec.base === legs[1].spec.base) return false;
     return true;
   }
-  function evaluate(legs, ctxs) {
+  // Chance and price of a whole builder. Within one team market the grid is exact; across markets and players the
+  // whole-match simulation (FP.bbsim) gives the joint chance, and the price is scaled the way a bookmaker scales a
+  // bet builder: by how much more (or less) likely the legs are together than apart.
+  function evaluate(legs, ctxs, simOpts) {
     const groups = new Map();
     for (const c of legs) { if (!groups.has(c.gkey)) groups.set(c.gkey, []); groups.get(c.gkey).push(c); }
-    let p = 1, dec = 1, ok = true;
+    let pg = 1, dec = 1, ok = true;
     for (const g of groups.values()) {
       if (!compatible(g)) ok = false;
       const e = groupEval(g, ctxs.get(g[0].fixtureId));
       if (g.length === 2 && e.p > 0.98 * Math.min(g[0].p, g[1].p)) ok = false; // one leg makes the other certain
-      p *= e.p; dec *= e.dec;
+      pg *= e.p; dec *= e.dec;
     }
-    return { p, dec, ok };
+    const pInd = legs.reduce((a, c) => a * c.p, 1);
+    if (simOpts === false || !FP.bbsim) return { p: pg, dec, ok, pInd, pGroups: pg };
+    const p = FP.bbsim.builderProb(legs, ctxs, simOpts);
+    return { p, dec: Math.max(1.01, dec * (pg / Math.max(p, 1e-9))), ok, pInd, pGroups: pg };
   }
 
   /* ---------- options per group: single legs and compatible pairs ---------- */
   function groupOptions(cands, ctx, exclude) {
     const byKey = new Map();
     for (const c of cands) {
-      if (exclude && (exclude.ids.has(c.id) || exclude.groups.has(c.gkey))) continue;
+      if (c.low || (exclude && (exclude.ids.has(c.id) || exclude.groups.has(c.gkey)))) continue;
       if (!byKey.has(c.gkey)) byKey.set(c.gkey, []);
       byKey.get(c.gkey).push(c);
     }
@@ -3619,12 +3837,14 @@ window.TEAMSHEET_VERSION='202611241948';
      Choose at most one option per group, at least one leg from every match, between minLegs and maxLegs legs in
      total, so that the combined odds reach the target and the sum of log chances is as high as possible.
      Dynamic programme over groups; odds are rounded down onto the grid so the real odds always reach the target. */
-  function solve(groups, fixtureIds, target, minLegs, maxLegs) {
-    const K = maxLegs, B = Math.max(1, Math.ceil(Math.log(target) / STEP)), W = (K + 1) * (B + 1);
+  function solve(groups, fixtureIds, target, minLegs, maxLegs, optional) {
+    const K = maxLegs, B = Math.max(0, Math.ceil(Math.log(Math.max(target, 1)) / STEP - 1e-9)), W = (K + 1) * (B + 1);
     const NEG = -Infinity;
     let v0 = new Float64Array(W).fill(NEG), v1 = new Float64Array(W).fill(NEG); // flag: this match has a leg yet
     v0[0] = 0;
-    const byMatch = fixtureIds.map((fid) => groups.filter((g) => g.fixtureId === fid));
+    // a match that already has a leg elsewhere (a must-include selection) gets a "no more legs" option
+    const SKIP = { legs: [], n: 0, p: 1, dec: 1, lp: 0, lb: 0 };
+    const byMatch = fixtureIds.map((fid) => (optional && optional.has(fid) ? [{ gkey: fid + '|skip', fixtureId: fid, opts: [SKIP] }] : []).concat(groups.filter((g) => g.fixtureId === fid)));
     if (byMatch.some((g) => !g.length)) return null;
     const choices = []; // per match, per group: Int32Array over (k, b) for flag 1
     for (let mi = 0; mi < byMatch.length; mi++) {
@@ -3635,7 +3855,7 @@ window.TEAMSHEET_VERSION='202611241948';
         const ch = new Int32Array(W);
         for (let f = 0; f < 2; f++) {
           const v = f ? v1 : v0;
-          for (let k = 0; k < K; k++) for (let b = 0; b <= B; b++) {
+          for (let k = 0; k <= K; k++) for (let b = 0; b <= B; b++) {
             const x = v[k * (B + 1) + b];
             if (x === NEG) continue;
             for (let oi = 0; oi < g.opts.length; oi++) {
@@ -3651,7 +3871,7 @@ window.TEAMSHEET_VERSION='202611241948';
       choices.push(mc);
     }
     let bestK = -1, bestV = NEG;
-    for (let k = Math.max(1, minLegs); k <= K; k++) { const x = v1[k * (B + 1) + B]; if (x > bestV) { bestV = x; bestK = k; } }
+    for (let k = Math.max(0, minLegs); k <= K; k++) { const x = v1[k * (B + 1) + B]; if (x > bestV) { bestV = x; bestK = k; } }
     if (bestK < 0) return null;
     const picked = [];
     let k = bestK, b = B;
@@ -3674,35 +3894,111 @@ window.TEAMSHEET_VERSION='202611241948';
     const ctxs = new Map(), cands = [], skipped = [];
     for (const rep of reports) {
       const f = rep.fixture;
-      if (f.status !== 'NS' || f.ts < (opts.now || Date.now())) { skipped.push({ fixture: f, reason: 'has already kicked off' }); continue; }
+      if (!opts.backtest && (f.status !== 'NS' || f.ts < (opts.now || Date.now()))) { skipped.push({ fixture: f, reason: 'has already kicked off' }); continue; }
       const r = matchCandidates(rep, opts);
-      if (!r.cands.length) { skipped.push({ fixture: f, reason: 'has no selections at the chance you set' }); continue; }
+      if (!r.cands.some((c) => !c.low)) { skipped.push({ fixture: f, reason: 'has no selections at the chance you set' }); continue; }
       ctxs.set(f.id, r.ctx);
       for (const c of r.cands) cands.push(c);
     }
     return { ctxs, cands, skipped, fixtureIds: [...ctxs.keys()] };
   }
-  function build(prep, opts, exclude) {
+  /* Selection types the user wants in every builder. One of each is placed first (the most likely available,
+     spreading across matches), then the optimiser adds whatever else is needed to reach the odds. */
+  const CATS = [
+    { id: 'goals', name: 'Total goals', test: (c) => /^g-tot-/.test(c.m.family) },
+    { id: 'corners', name: 'Team or match corners', test: (c) => c.key === 'corners' },
+    { id: 'cards', name: 'Team or match cards', test: (c) => c.key === 'cards' },
+    { id: 'pshots', name: 'Player shots', test: (c) => /^p-shots-/.test(c.m.family) },
+    { id: 'psot', name: 'Player shots on target', test: (c) => /^p-sot-/.test(c.m.family) },
+    { id: 'pfc', name: 'Player fouls', test: (c) => /^p-fc-/.test(c.m.family) },
+    { id: 'pfd', name: 'Player fouled', test: (c) => /^p-fd-/.test(c.m.family) },
+    { id: 'psaves', name: 'Keeper saves', test: (c) => /^p-saves-/.test(c.m.family) },
+  ];
+  function core(prep, include, exclude) {
+    const cats = CATS.filter((k) => include && include.has(k.id));
+    // tiers: a fresh selection at the minimum chance; then (second builder only) reusing the first builder's team
+    // line; then a fresh one from 50% up. Players used in the first builder are never reused.
+    const tier = (c) => {
+      const hardOut = exclude && exclude.groups.has(c.gkey), reused = exclude && exclude.ids.has(c.id);
+      if (hardOut) return 0;
+      if (!c.low && !reused) return 3;
+      if (!c.low && reused) return 2;
+      return reused ? 0 : 1;
+    };
+    const pools = cats.map((k) => ({ k, pool: prep.cands.filter((c) => k.test(c) && tier(c) > 0) })).sort((a, b) => a.pool.length - b.pool.length);
+    const legs = [], used = new Set(), covered = new Set(), missing = [];
+    for (const { k, pool } of pools) {
+      let best = null, bs = -Infinity;
+      for (const c of pool) { if (used.has(c.gkey)) continue; const sc = tier(c) * 10 + c.p - (covered.has(c.fixtureId) ? 0.03 : 0); if (sc > bs) { bs = sc; best = c; } }
+      if (!best) { missing.push(k.name); continue; }
+      legs.push(Object.assign({}, best, { must: k.name }));
+      used.add(best.gkey); covered.add(best.fixtureId);
+    }
+    return { legs, used, covered, missing };
+  }
+  function build(prep, opts, exclude, coreExclude) {
     const target = opts.target, n = prep.fixtureIds.length;
     if (!n) return { ok: false, reason: 'None of the chosen matches can be used.' };
     if (!(target > 1) || target > 101) return { ok: false, reason: 'Choose odds between 1/10 and 100/1.' };
-    const minLegs = Math.max(2, n), maxLegs = Math.max(minLegs, Math.min(opts.maxLegs || 8, 12));
+    const C = opts.fixedCore ? { legs: opts.fixedCore, used: new Set(opts.fixedCore.map((c) => c.gkey)), covered: new Set(opts.fixedCore.map((c) => c.fixtureId)), missing: opts.fixedMissing || [] }
+      : core(prep, opts.include, coreExclude || exclude);
+    const minLegs = Math.max(2, n), maxLegs = Math.max(minLegs, C.legs.length, Math.min(opts.maxLegs || 8, 12));
+    const cdec = C.legs.length ? evaluate(C.legs, prep.ctxs).dec : 1;
+    const ex = { ids: new Set(exclude ? exclude.ids : []), groups: new Set([...(exclude ? exclude.groups : []), ...C.used]) };
     const groups = [];
-    for (const fid of prep.fixtureIds) for (const g of groupOptions(prep.cands.filter((c) => c.fixtureId === fid), prep.ctxs.get(fid), exclude)) groups.push(g);
-    const picked = solve(groups, prep.fixtureIds, target, minLegs, maxLegs);
-    if (!picked) {
-      const most = prep.cands.slice().sort((a, b) => b.dec - a.dec);
-      return { ok: false, reason: `With up to ${maxLegs} selections at ${Math.round(opts.minLegP * 100)}% or more each, these matches cannot reach those odds. Lower the odds, allow more selections, lower the chance per selection or add a match.`, longest: most[0] };
+    for (const fid of prep.fixtureIds) for (const g of groupOptions(prep.cands.filter((c) => c.fixtureId === fid), prep.ctxs.get(fid), ex)) groups.push(g);
+    let picked = null, res = null, aim = target;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      picked = solve(groups, prep.fixtureIds, aim / cdec, Math.max(0, minLegs - C.legs.length), maxLegs - C.legs.length, C.covered);
+      if (!picked) break;
+      const legs = C.legs.slice();
+      for (const o of picked) for (const c of o.legs) legs.push(c);
+      res = finish(legs, prep, opts);
+      if (res.meets) break;
+      aim *= (target / res.dec) * 1.01; // linked legs shortened the price: aim a little higher and pick again
     }
-    const legs = [];
-    for (const o of picked) for (const c of o.legs) legs.push(c);
-    return finish(legs, prep, opts);
+    if (picked && res && !res.meets) picked = null;
+    if (!picked) {
+      return { ok: false, missing: C.missing, reason: `With up to ${maxLegs} selections at ${Math.round(opts.minLegP * 100)}% or more each, these matches cannot reach those odds.${C.legs.length ? ` Your always-include types already use ${C.legs.length} of the ${maxLegs} selections.` : ''} Lower the odds, allow more selections, lower the chance per selection${C.legs.length ? ', untick some types' : ''} or add a match.` };
+    }
+    if (opts.sim !== false && FP.bbsim) res = polish(res, prep, opts, minLegs);
+    return Object.assign(res, { missing: C.missing, coreDec: cdec, coreN: C.legs.length });
   }
   function finish(legs, prep, opts) {
     legs.sort((a, b) => (a.m.kickoff - b.m.kickoff) || (a.fixtureId > b.fixtureId ? 1 : a.fixtureId < b.fixtureId ? -1 : 0) || order(a) - order(b) || b.p - a.p);
-    const e = evaluate(legs, prep.ctxs);
-    const pInd = legs.reduce((a, c) => a * c.p, 1);
-    return { ok: true, legs, p: e.p, dec: e.dec, value: e.p * e.dec - 1, meets: e.dec >= opts.target * 0.999, linkedAdj: Math.abs(e.p - pInd) > 0.002, allPriced: legs.every((c) => c.priced) };
+    const e = evaluate(legs, prep.ctxs, opts.sim);
+    return { ok: true, legs, p: e.p, dec: e.dec, pInd: e.pInd, value: e.p * e.dec - 1, meets: e.dec >= opts.target * 0.999, linkedAdj: Math.abs(e.p - e.pInd) > 0.002, allPriced: legs.every((c) => c.priced) };
+  }
+  /* The optimiser prices legs as if unrelated; the simulation then knows better. Polish the result with the
+     simulation: drop a leg the odds do not need, or swap one (not a ticked-type leg) for another from the same
+     match, whenever that raises the chance and still reaches the odds. */
+  function polish(b, prep, opts, minLegs) {
+    const T = opts.target * 0.999, quick = { N: 5000 };
+    const covers = (legs) => prep.fixtureIds.every((f) => legs.some((c) => c.fixtureId === f));
+    let cur = b;
+    for (let round = 0; round < 3; round++) {
+      let best = null;
+      const tryLegs = (legs) => {
+        if (legs.length < minLegs || !covers(legs)) return;
+        const e = evaluate(legs, prep.ctxs, quick);
+        if (!e.ok || e.dec < T * 1.01) return;
+        if (e.p > (best ? best.p : cur.p * 1.01)) best = { p: e.p, legs };
+      };
+      cur.legs.forEach((c, i) => { if (!c.must) tryLegs(cur.legs.filter((_, j) => j !== i)); });
+      const ids = new Set(cur.legs.map((c) => c.id));
+      cur.legs.forEach((out, i) => {
+        if (out.must) return;
+        const alts = prep.cands.filter((c) => c.fixtureId === out.fixtureId && !ids.has(c.id) && !c.low)
+          .map((c) => { const legs = cur.legs.slice(); legs[i] = c; return { legs, q: evaluate(legs, prep.ctxs, false) }; })
+          .filter((x) => x.q.ok && x.q.dec >= T).sort((x, y) => y.q.p - x.q.p).slice(0, 4);
+        for (const a of alts) tryLegs(a.legs);
+      });
+      if (!best) break;
+      const next = finish(best.legs.slice(), prep, opts);
+      if (!next.meets || next.p <= cur.p) break;
+      cur = Object.assign(next, { polished: true });
+    }
+    return cur;
   }
   const order = (c) => (c.player ? 2 : c.key === 'goals' ? 0 : 1);
   function buildTwo(reports, opts) {
@@ -3710,11 +4006,61 @@ window.TEAMSHEET_VERSION='202611241948';
     const a = build(prep, opts);
     let b = null;
     if (a.ok) {
-      b = build(prep, opts, { ids: new Set(), groups: new Set(a.legs.map((c) => c.gkey)) });
-      if (!b.ok) b = build(prep, opts, { ids: new Set(a.legs.map((c) => c.id)), groups: new Set() });
+      // second builder: different players and different lines; must-include types can reuse a team market with another line
+      const ids = new Set(a.legs.map((c) => c.id)), groups = new Set(a.legs.map((c) => c.gkey));
+      const plGroups = new Set(a.legs.filter((c) => c.player).map((c) => c.gkey));
+      b = build(prep, opts, { ids, groups }, { ids, groups: plGroups });
+      if (!b.ok) b = build(prep, opts, { ids, groups: new Set() }, { ids, groups: new Set() });
       if (b.ok && b.legs.map((c) => c.id).sort().join() === a.legs.map((c) => c.id).sort().join()) b = { ok: false, reason: 'No different combination reaches the odds.' };
     }
-    return { prep, builders: [a, b].filter(Boolean), skipped: prep.skipped };
+    if (a.ok) a.kind = 'main';
+    if (b && b.ok) b.kind = 'alt';
+    // third builder: the highest chance at these odds, ignoring the ticked types (fewer selections, less margin)
+    let c = null;
+    if (a.ok && opts.include && opts.include.size) {
+      c = build(prep, Object.assign({}, opts, { include: new Set() }));
+      if (c.ok) c.kind = 'best';
+      const same = (x) => x && x.ok && x.legs.map((l) => l.id).sort().join() === c.legs.map((l) => l.id).sort().join();
+      if (c.ok && (same(a) || same(b))) c = null;
+      else if (!c.ok) c = null;
+    }
+    return { prep, builders: [a, b, c].filter(Boolean), skipped: prep.skipped };
+  }
+
+  /* What each ticked type costs: take that type's selection out of the main builder, keep the other ticked ones,
+     and let the optimiser add whatever is needed to get back to the odds. */
+  function typeCosts(prep, opts, main) {
+    const out = [];
+    if (!main || !main.ok || !opts.include) return out;
+    const must = main.legs.filter((c) => c.must);
+    for (const k of CATS) {
+      const leg = must.find((c) => c.must === k.name);
+      if (!opts.include.has(k.id) || !leg) continue;
+      const inc = new Set(opts.include); inc.delete(k.id);
+      const b = build(prep, Object.assign({}, opts, { include: inc, fixedCore: must.filter((c) => c !== leg), fixedMissing: main.missing }));
+      if (b.ok) b.kind = 'main';
+      out.push({ id: k.id, name: k.name, leg, builder: b.ok ? b : null, p: b.ok ? b.p : null, dec: b.ok ? b.dec : null, gain: b.ok ? b.p - main.p : null });
+    }
+    return out.sort((x, y) => (y.gain == null ? -1 : y.gain) - (x.gain == null ? -1 : x.gain));
+  }
+
+  /* How strongly each leg is linked to the rest: chance of all legs over (chance without it x its own chance).
+     Above 1, the leg tends to land when the others do, and bookmakers shorten the price for that. */
+  function linkScores(b, prep) {
+    if (!b || !b.ok || b.legs.length < 2) return [];
+    return b.legs.map((c, i) => {
+      const rest = b.legs.filter((_, j) => j !== i);
+      const pr = rest.length === 1 ? rest[0].p : (FP.bbsim ? FP.bbsim.builderProb(rest, prep.ctxs) : rest.reduce((a, x) => a * x.p, 1));
+      return b.p / Math.max(1e-9, pr * c.p);
+    });
+  }
+
+  /* Bookmaker price check: expected return per 1 staked and a plain verdict. */
+  function priceVerdict(p, dec) {
+    if (!(dec > 1) || !(p > 0)) return null;
+    const ret = p * dec;
+    const band = ret >= 1.05 ? 'value' : ret >= 0.95 ? 'fair' : ret >= 0.8 ? 'margin' : 'poor';
+    return { ret, fair: 1 / p, band };
   }
 
   /* ---------- swaps ---------- */
@@ -3725,14 +4071,18 @@ window.TEAMSHEET_VERSION='202611241948';
     const ids = new Set(builder.legs.map((c) => c.id));
     const res = [];
     for (const c of prep.cands) {
-      if (c.fixtureId !== out.fixtureId || ids.has(c.id)) continue;
+      if (c.fixtureId !== out.fixtureId || ids.has(c.id) || c.low) continue;
       const legs = builder.legs.slice(); legs[idx] = c;
-      const e = evaluate(legs, prep.ctxs);
-      if (!e.ok) continue;
-      res.push({ c, p: e.p, dec: e.dec, meets: e.dec >= opts.target * 0.999 });
+      const quick = evaluate(legs, prep.ctxs, false);
+      if (!quick.ok) continue;
+      res.push({ c, legs, quick });
     }
-    res.sort((x, y) => (y.meets - x.meets) || (x.meets ? y.p - x.p : y.dec - x.dec));
-    return res.slice(0, limit || 6);
+    // shortlist on the quick estimate, then price the shortlist with the simulation
+    const T = opts.target * 0.999;
+    res.sort((x, y) => ((y.quick.dec >= T) - (x.quick.dec >= T)) || (x.quick.dec >= T ? y.quick.p - x.quick.p : y.quick.dec - x.quick.dec));
+    const short = res.slice(0, (limit || 6) * 2).map((r) => { const e = evaluate(r.legs, prep.ctxs, opts.sim === false ? false : opts.sim); return { c: r.c, p: e.p, dec: e.dec, meets: e.dec >= T }; });
+    short.sort((x, y) => (y.meets - x.meets) || (x.meets ? y.p - x.p : y.dec - x.dec));
+    return short.slice(0, limit || 6);
   }
   function applySwap(builder, idx, cand, prep, opts) {
     const legs = builder.legs.slice(); legs[idx] = cand;
@@ -3782,7 +4132,7 @@ window.TEAMSHEET_VERSION='202611241948';
     return [hist, exp ? exp + '.' : ''].filter(Boolean).join(' ');
   }
 
-  FP.builder = { teamSpec, matchCandidates, evaluate, prepare, build, buildTwo, swapOptions, applySwap, removeLeg, justify, solve, groupOptions, GROUP_NAME, BB_MARGIN, STEP };
+  FP.builder = { typeCosts, linkScores, priceVerdict, CATS, core, teamSpec, matchCandidates, evaluate, prepare, build, buildTwo, swapOptions, applySwap, removeLeg, justify, solve, groupOptions, GROUP_NAME, BB_MARGIN, STEP };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
 /* ===== ui.js ===== */
@@ -3831,7 +4181,8 @@ window.TEAMSHEET_VERSION='202611241948';
     settings: loadSettings(), view: 'match', status: null, statusErr: null, slip: [], slipOpen: false, bets: [], betsUi: { period: 'all', show: 20, armed: null, busy: false, msg: '', keep: false },
     match: { league: null, mode: 'fixtures', list: null, teams: null, home: '', away: '', report: null, loading: null, error: null, tab: 'picks', side: 'home', open: new Set(), pickList: 'best', live: null, liveSide: 'home', liveErr: null },
     day: { date: londonISO(Date.now()), leagues: null, report: null, loading: null, error: null, tab: 'best', group: 'all' },
-    build: { league: null, lists: new Map(), selected: new Map(), target: '5/1', minP: 0.65, maxLegs: 8, players: true, reports: new Map(), loading: null, error: null, result: null, active: 0, swap: null },
+    priceChecks: {}, slipPrice: null,
+    build: { league: null, lists: new Map(), selected: new Map(), target: '5/1', minP: 0.65, maxLegs: 12, players: true, include: new Set(['goals', 'corners', 'cards', 'pshots', 'psot', 'pfc', 'pfd', 'psaves']), reports: new Map(), loading: null, error: null, result: null, active: 0, swap: null },
     acca: { mode: 'win', start: londonISO(Date.now()), days: 1, leagues: null, n: 4, target: '5/1', minLeg: '1/5', freezeN: 4, freezeMin: '6/4', minLead: 0.3, loading: null, error: null, result: null, data: null, dataKey: '' },
   };
 
@@ -3979,7 +4330,7 @@ window.TEAMSHEET_VERSION='202611241948';
     const ui = state.betsUi;
     return `<div class="panel" id="logform"><h3>Log this bet</h3><p class="small muted">Placed it? Log it here and the app settles it from the result and tracks your profit and loss. Nothing is placed with a bookmaker.</p>
       <div class="row"><div class="grow"><label class="field" for="log-stake">Stake (£)</label><input type="number" id="log-stake" inputmode="decimal" min="0" step="0.01" placeholder="5.00"></div>
-      <div class="grow"><label class="field" for="log-odds">Odds you got</label><input type="text" id="log-odds" placeholder="e.g. 9/2 or 5.5" value="${esc(t.dec ? t.dec.toFixed(2) : '')}"></div></div>
+      <div class="grow"><label class="field" for="log-odds">Odds you got</label><input type="text" id="log-odds" placeholder="e.g. 9/2 or 5.5" value="${esc(state.slipPrice ? state.slipPrice.toFixed(2) : t.dec ? t.dec.toFixed(2) : '')}"></div></div>
       <label class="field" for="log-book">Bookmaker</label><input type="text" id="log-book" list="books" placeholder="Sky Bet" value="${esc(state.settings.lastBook || '')}">
       <datalist id="books"><option value="Sky Bet"><option value="Paddy Power"><option value="Betfair"><option value="Betfair Exchange"><option value="bet365"><option value="William Hill"></datalist>
       <div class="toggle"><input type="checkbox" id="log-keep" ${ui.keep ? 'checked' : ''}><label for="log-keep">Keep these selections in the builder</label></div>
@@ -4585,7 +4936,8 @@ window.TEAMSHEET_VERSION='202611241948';
     return `<div class="lucky-total"><div><div>All ${r.legs.length} win</div><div class="small muted">Fair odds ${esc(frac(1 / r.p))}</div></div><div class="prob">${pct(r.p)}</div></div>
       <div class="row" style="margin-top:6px"><span class="grow">Combined odds <b>${esc(frac(r.dec))}</b> (${r.dec.toFixed(2)})</span><span class="${r.value > 0 ? 'value' : 'novalue'}">${r.value > 0 ? 'Value +' + Math.round(r.value * 100) + '%' : 'Margin ' + Math.round(-r.value * 100) + '%'}</span></div>
       ${extra || ''}${r.allPriced ? '' : '<p class="small muted">Some legs have no bookmaker price yet, so their odds are estimated from the model with a typical margin. Prices usually appear a few days before kick-off.</p>'}
-      <div class="row" style="margin-top:10px"><button class="btn grow" data-act="acca-add">Add all to bet slip</button></div>`;
+      ${priceCheck('acca:' + r.legs.map((c) => c.fixtureId + c.side).join(','), r.pWithFreeze || r.p, false, r.pWithFreeze ? 'Judged with the freeze used.' : '')}
+      <div class="row" style="margin-top:10px"><button class="btn grow" data-act="acca-add" data-key="${esc('acca:' + r.legs.map((c) => c.fixtureId + c.side).join(','))}">Add all to bet slip</button></div>`;
   }
   function viewWinAcca(r) {
     if (!r.ok) return `<div class="empty">${esc(r.reason)}</div>`;
@@ -4668,6 +5020,9 @@ window.TEAMSHEET_VERSION='202611241948';
       <div class="row" style="align-items:flex-start"><div class="grow"><label class="field" for="bbMinP">Each selection at least</label>${opt('bbMinP', [[0.55, '55% chance'], [0.6, '60% chance'], [0.65, '65% chance'], [0.7, '70% chance'], [0.75, '75% chance'], [0.8, '80% chance']], B.minP)}</div>
       <div class="grow"><label class="field" for="bbMaxLegs">Most selections</label>${opt('bbMaxLegs', [4, 5, 6, 8, 10, 12].map((n) => [n, n]), B.maxLegs)}</div></div>
       <div class="toggle"><input type="checkbox" id="bbPlayers" data-bind="bbPlayers" ${B.players ? 'checked' : ''}><label for="bbPlayers">Include player bets (starting players only)</label></div>
+      <label class="field">Always include one of each</label>
+      <div class="chips" style="flex-wrap:wrap" role="group" aria-label="Always include">${FP.builder.CATS.filter((k) => B.players || !/^p/.test(k.id)).map((k) => `<button class="chip" data-act="bb-inc" data-v="${k.id}" aria-pressed="${B.include.has(k.id)}">${esc(k.name)}</button>`).join('')}</div>
+      <p class="small muted" style="margin-top:4px">The most likely selection of each ticked type goes in first, then more are added to reach your odds. If no selection of a type reaches your minimum chance, the best one from 50% up is used and marked.</p>
       <button class="btn wide" style="margin-top:6px" data-act="bb-build" ${sel.length && !B.loading ? '' : 'disabled'}>${sel.length ? `Build for ${sel.length} match${sel.length === 1 ? '' : 'es'}` : 'Choose a match first'}</button></div>`;
     let out = '';
     if (B.error) out += `<div class="error">${esc(B.error)}</div>`;
@@ -4682,6 +5037,8 @@ window.TEAMSHEET_VERSION='202611241948';
     catch (err) { B.lists.set(league, { list: [], error: friendlyError(err) }); }
     if (state.view === 'build') { const y = window.scrollY; render(); window.scrollTo(0, y); }
   }
+  const bbName = (b, i) => (b.kind === 'best' ? 'Best chance' : `Builder ${i + 1}`);
+  const BB_SUB = { main: 'Highest chance with your ticked types', alt: 'A different set of selections', best: 'Highest chance at your odds, ignoring the ticked types' };
   function viewBuildResult(R) {
     const B = state.build;
     let h = '';
@@ -4689,18 +5046,21 @@ window.TEAMSHEET_VERSION='202611241948';
     const bs = R.builders;
     if (!bs.length || !bs[0].ok) return h + `<div class="empty">${esc((bs[0] && bs[0].reason) || 'No bet builder could be made.')}</div>`;
     if (B.active >= bs.length) B.active = 0;
-    h += `<div class="bb-switch" role="tablist">${bs.map((b, i) => `<button role="tab" data-act="bb-tab" data-v="${i}" aria-selected="${B.active === i}"><span class="n">Builder ${i + 1}</span><span class="s">${b.ok ? `${esc(frac(b.dec))}, ${pct(b.p)}` : 'none found'}</span></button>`).join('')}</div>`;
+    h += `<div class="bb-switch" role="tablist">${bs.map((b, i) => `<button role="tab" data-act="bb-tab" data-v="${i}" aria-selected="${B.active === i}"><span class="n">${esc(bbName(b, i))}</span><span class="s">${b.ok ? `${esc(frac(b.dec))}, ${pct(b.p)}` : 'none found'}</span></button>`).join('')}</div>`;
     const b = bs[B.active];
     h += b.ok ? ticket(b, B.active, R) : `<div class="empty">${esc(b.reason)}</div>`;
+    if (b.ok && b.kind === 'main' && R.opts.include && R.opts.include.size) h += costPanel(b, R);
     const lineups = R.prep.fixtureIds.map((fid) => R.prep.ctxs.get(fid));
     const pending = lineups.filter((c) => !c.confirmed);
     h += `<div class="panel small">${pending.length ? `<p style="margin-top:0"><b>Team news.</b> ${pending.length === lineups.length ? 'No team sheets are out yet' : 'Some team sheets are not out yet'}, so player selections only use players very likely to start (80% or more). Rebuild about an hour before kick-off to use the confirmed starting XI only.</p>` : '<p style="margin-top:0"><b>Team news.</b> Team sheets are confirmed for every match, so player selections only use the starting XI.</p>'}
-      <p>Prices marked <i>est.</i> have no bookmaker price on ESPN, so they are the model's chance with a typical 8% bet builder margin. Selections from the same match that depend on each other (for example a team win and over 1.5 goals) are priced together from the score model, as bookmakers do. Sky Bet's bet builder price will still differ: check it before placing.</p>
+      <p>Prices marked <i>est.</i> have no bookmaker price on ESPN, so they are the model's chance with a typical 8% bet builder margin. Selections from the same match are priced together from a simulation of the whole match, so linked ones (a keeper's saves and the other side's shots on target, a striker's shots and his team's shots) are not treated as unrelated. Bookmakers shorten the price for linked selections in the same way. Sky Bet's bet builder price will still differ: check it before placing.</p>
       <button class="btn secondary wide" data-act="bb-rebuild">Rebuild with the latest team news</button></div>`;
     return h;
   }
   function ticket(b, bi, R) {
     const B = state.build, target = R.opts.target;
+    if (!b._links) b._links = FP.builder.linkScores(b, R.prep);
+    const links = b._links;
     const byFx = new Map();
     b.legs.forEach((c, i) => { if (!byFx.has(c.fixtureId)) byFx.set(c.fixtureId, []); byFx.get(c.fixtureId).push([c, i]); });
     let body = '';
@@ -4709,27 +5069,63 @@ window.TEAMSHEET_VERSION='202611241948';
       body += `<div class="tk-match"><div class="grow"><b>${esc(f.home.name)} v ${esc(f.away.name)}</b><div class="small muted">${esc(fmtShort(f.ts))} ${fmtTime(f.ts)}, ${esc(f.compName || '')}</div></div><span class="badge ${ctx.confirmed ? 'ok' : 'warn'}">${ctx.confirmed ? 'Starting XI out' : 'Predicted XI'}</span></div>`;
       for (const [c, i] of legs) {
         const open = B.swap && B.swap.b === bi && B.swap.i === i;
-        body += `<div class="tk-leg k-${c.player ? 'player' : c.key}${open ? ' open' : ''}"><div class="grow"><div class="tk-cat">${esc(BB_CAT(c))}</div><div class="tk-lbl">${esc(c.m.label)}</div><div class="tk-why">${esc(FP.builder.justify(c, R.prep))}</div></div>
+        body += `<div class="tk-leg k-${c.player ? 'player' : c.key}${open ? ' open' : ''}"><div class="grow"><div class="tk-cat">${esc(BB_CAT(c))}${links[i] > 1.08 ? ' <span class="tk-link" title="Tends to land when the others do">Linked</span>' : ''}</div><div class="tk-lbl">${esc(c.m.label)}</div><div class="tk-why">${esc(FP.builder.justify(c, R.prep))}${c.low ? ` <b>Best available ${esc(c.must.toLowerCase())} selection, below your ${pct(R.opts.minLegP)} minimum.</b>` : ''}</div></div>
           <div class="tk-side"><div class="tk-p">${pct(c.p)}</div><div class="tk-price">${esc(frac(c.dec))}${c.priced ? '' : ' <i>est.</i>'}</div><button class="tk-swap" data-act="bb-swap" data-b="${bi}" data-i="${i}" aria-expanded="${open}">${open ? 'Close' : 'Swap'}</button></div></div>`;
         if (open) body += swapPanel(b, bi, i, R);
       }
     }
     const short = !b.meets;
     return `<article class="ticket">
-      <header class="tk-head"><div><div class="tk-name">Builder ${bi + 1}</div><div class="tk-sub">${bi === 0 ? 'Highest chance of landing' : 'A different set of selections'}${b.edited ? ', edited' : ''}</div></div>
+      <header class="tk-head"><div><div class="tk-name">${esc(bbName(b, bi))}</div><div class="tk-sub">${esc(BB_SUB[b.kind] || '')}${b.edited ? ', edited' : ''}</div></div>
         <div class="tk-odds"><div class="big">${esc(frac(b.dec))}</div><div class="small">${b.dec.toFixed(2)}, ${pct(b.p)} chance</div></div></header>
+      ${b.missing && b.missing.length ? `<div class="note" style="margin:0;border-radius:0">No ${esc(b.missing.join(', ').toLowerCase())} selection reached 50% in ${R.prep.fixtureIds.length > 1 ? 'these matches' : 'this match'}${bi > 0 ? ' with different players' : ''}, so ${b.missing.length > 1 ? 'they are' : 'it is'} not in this builder.</div>` : ''}
+      ${b.coreDec && b.coreDec > R.opts.target * 1.05 ? `<div class="note" style="margin:0;border-radius:0">Your ticked types alone come to ${esc(frac(b.coreDec))}, above your ${esc(frac(R.opts.target))} target. Untick some for a shorter price.</div>` : ''}
       <div class="tk-body">${body}</div>
       <div class="tk-perf" aria-hidden="true"></div>
       <footer class="tk-foot">
         <div class="tk-row"><span>${b.legs.length} selections all land</span><b>${pct(b.p)}</b></div>
+        ${b.pInd != null && pct(b.p) !== pct(b.pInd) ? `<div class="tk-row small muted"><span>If the selections were unrelated</span><span>${pct(b.pInd)}</span></div>` : ''}
         <div class="tk-row"><span>Estimated combined odds</span><b>${esc(frac(b.dec))} <span class="muted">(${b.dec.toFixed(2)})</span></b></div>
         <div class="tk-row"><span>Fair odds from the model</span><b>${esc(frac(1 / b.p))}</b></div>
         ${short ? `<div class="note" style="margin:8px 0 0">After your changes this is below your target of ${esc(frac(target))}.</div>` : ''}
-        <div class="row" style="margin-top:12px"><button class="btn grow" data-act="bb-add" data-b="${bi}">Add to bet slip</button></div>
+        ${priceCheck('bb:' + b.legs.map((c) => c.id).join(','), b.p, links.some((x) => x > 1.08))}
+        <div class="row" style="margin-top:12px"><button class="btn grow" data-act="bb-add" data-b="${bi}" data-key="${esc('bb:' + b.legs.map((c) => c.id).join(','))}">Add to bet slip</button></div>
       </footer></article>`;
   }
+  function costPanel(b, R) {
+    const B = state.build;
+    if (!B.costs || B.costs.key !== b.legs.map((c) => c.id).join(',')) {
+      return `<div class="panel"><h3>What your ticked types cost</h3><p class="small muted">Each ticked type adds a selection, and every selection carries bookmaker margin. See how much more likely this builder is without each one.</p>
+        <button class="btn secondary wide" data-act="bb-costs" ${B.costsBusy ? 'disabled' : ''}>${B.costsBusy ? 'Working it out' : 'Show what each type costs'}</button></div>`;
+    }
+    const rows = B.costs.list.map((c, k) => {
+      const better = c.p != null && c.p - b.p >= 0.003, p1 = (x) => (x * 100).toFixed(1) + '%';
+      return `<div class="row bb-cost"><div class="grow"><b>${esc(c.name)}</b><div class="small muted">${esc(c.leg.m.label)}</div></div>
+        <div class="tk-res">${better ? `<b>${p1(b.p)} to ${p1(c.p)}</b><span class="small">at ${esc(frac(c.dec))}</span>` : '<span class="small muted">No better without it</span>'}</div>
+        ${better ? `<button class="tk-swap" data-act="bb-drop" data-k="${k}">Drop it</button>` : ''}</div>`;
+    }).join('');
+    return `<div class="panel"><h3>What your ticked types cost</h3><p class="small muted">Chance of this builder now, and without each type's selection (other selections are added back to reach your odds). Drop it replaces Builder 1 and unticks the type.</p>${rows}</div>`;
+  }
+  function priceCheck(key, p, linked, note) {
+    const v = state.priceChecks[key] || '';
+    const dec = v ? parseOdds(v) : null, r = dec ? FP.builder.priceVerdict(p, dec) : null;
+    const pence = (x) => (x >= 1 ? '£' + x.toFixed(2) : Math.round(x * 100) + 'p');
+    let out = '';
+    if (v && !r) out = '<p class="small" style="color:var(--red)">Enter the price as a fraction (9/2) or decimal (5.5).</p>';
+    else if (r) {
+      const fair = esc(frac(r.fair)), ret = pence(r.ret);
+      const txt = { value: `<b>Value.</b> Sky Bet are paying more than the chance suggests: fair odds are ${fair}, and this returns about ${ret} for every £1 staked over time.`,
+        fair: `<b>About fair.</b> Close to the fair odds of ${fair}: about ${ret} back per £1 over time.`,
+        margin: `<b>Usual bookmaker margin.</b> Fair odds are ${fair}; this returns about ${ret} per £1 over time.`,
+        poor: `<b>Poor price.</b> Fair odds are ${fair}; this returns only about ${ret} per £1 over time.${linked ? ' Linked selections are what bookmakers cut hardest, so try swapping one of those, or use another builder.' : ' Try another builder or swap a selection.'}` }[r.band];
+      out = `<div class="pc-verdict pc-${r.band}">${txt}${note ? ` <span class="muted">${esc(note)}</span>` : ''}</div>`;
+    }
+    return `<div class="pc"><label class="field" for="pc-${esc(key)}">Sky Bet's price for this</label><input type="text" id="pc-${esc(key)}" data-bind="pc" data-key="${esc(key)}" value="${esc(v)}" placeholder="Type the price, e.g. 11/2" inputmode="text">${out}</div>`;
+  }
   function swapPanel(b, bi, i, R) {
-    const alts = FP.builder.swapOptions(b, i, R.prep, R.opts, 6);
+    const ck = bi + '|' + i + '|' + b.legs.map((c) => c.id).join(',');
+    if (!state.build.swapCache || state.build.swapCache.k !== ck) state.build.swapCache = { k: ck, alts: FP.builder.swapOptions(b, i, R.prep, R.opts, 6) };
+    const alts = state.build.swapCache.alts;
     bbAlts.length = 0;
     const rows = alts.map((a, k) => { bbAlts.push(a.c); return `<button class="tk-alt${a.meets ? '' : ' short'}" data-act="bb-swap-pick" data-b="${bi}" data-i="${i}" data-k="${k}">
       <span class="grow"><span class="tk-cat">${esc(BB_CAT(a.c))}</span><b>${esc(a.c.m.label)}</b><span class="small muted">${pct(a.c.p)}, ${esc(frac(a.c.dec))}${a.c.priced ? '' : ' est.'}</span></span>
@@ -4756,7 +5152,8 @@ window.TEAMSHEET_VERSION='202611241948';
       }
       B.loading = 'Picking selections'; setProgress(B.loading);
       await new Promise((r) => setTimeout(r, 0));
-      const opts = { target, minLegP: B.minP, maxLegs: B.maxLegs, includePlayers: B.players, now: Date.now() };
+      const include = new Set([...B.include].filter((k) => B.players || !/^p/.test(k)));
+      const opts = { target, minLegP: B.minP, maxLegs: B.maxLegs, includePlayers: B.players, include, now: Date.now() };
       B.result = Object.assign(FP.builder.buildTwo(reps, opts), { opts });
       B.active = 0; B.showList = false;
     } catch (err) { B.error = err.kind ? friendlyError(err) : err.message; }
@@ -4888,10 +5285,31 @@ window.TEAMSHEET_VERSION='202611241948';
         const r = state.acca.result; if (!r || !r.ok) break;
         let n = 0;
         for (const c of r.legs) if (c.market) { const leg = legOf(c.market); if (!state.slip.some((x) => x.id === leg.id)) { state.slip.push(leg); n++; } }
+        const pcv = state.priceChecks[b.dataset.key]; state.slipPrice = pcv ? parseOdds(pcv) : null;
         saveSlip(); toast(`Added ${n} selection${n === 1 ? '' : 's'} to the bet slip`); const y = window.scrollY; render(); window.scrollTo(0, y);
         break;
       }
       case 'bb-league': state.build.league = +id; render(); break;
+      case 'bb-costs': {
+        const B = state.build, R = B.result, main = R && R.builders.find((x) => x.kind === 'main');
+        if (!main || B.costsBusy) break;
+        B.costsBusy = true; const y = window.scrollY; render(); window.scrollTo(0, y);
+        setTimeout(() => {
+          try { B.costs = { key: main.legs.map((c) => c.id).join(','), list: FP.builder.typeCosts(R.prep, R.opts, main) }; }
+          catch (err) { toast('Could not work that out'); }
+          B.costsBusy = false; const y2 = window.scrollY; render(); window.scrollTo(0, y2);
+        }, 30);
+        break;
+      }
+      case 'bb-drop': {
+        const B = state.build, R = B.result, c = B.costs && B.costs.list[+b.dataset.k];
+        if (!R || !c || !c.builder) break;
+        const i = R.builders.findIndex((x) => x.kind === 'main');
+        R.builders[i] = Object.assign(c.builder, { edited: true });
+        R.opts = Object.assign({}, R.opts, { include: new Set([...R.opts.include].filter((k) => k !== c.id)) });
+        B.include.delete(c.id); B.costs = null; B.active = i; B.swap = null;
+        toast(`Dropped ${c.name.toLowerCase()}`); const y = window.scrollY; render(); window.scrollTo(0, y); break;
+      }
       case 'bb-showlist': state.build.showList = true; render(); break;
       case 'bb-toggle': {
         const B = state.build, L = B.lists.get(B.league), f = L && L.list.find((x) => String(x.id) === String(id));
@@ -4903,6 +5321,7 @@ window.TEAMSHEET_VERSION='202611241948';
       }
       case 'bb-unpick': { const B = state.build; for (const k of B.selected.keys()) if (String(k) === String(id)) B.selected.delete(k); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
       case 'bb-target': state.build.target = v; render(); break;
+      case 'bb-inc': { const I = state.build.include; if (I.has(v)) I.delete(v); else I.add(v); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
       case 'bb-build': runBuild(false); break;
       case 'bb-rebuild': runBuild(true); break;
       case 'bb-tab': state.build.active = +v; state.build.swap = null; render(); break;
@@ -4927,7 +5346,8 @@ window.TEAMSHEET_VERSION='202611241948';
         const R = state.build.result, bb = R && R.builders[+b.dataset.b]; if (!bb || !bb.ok) break;
         let n = 0;
         for (const c of bb.legs) { const leg = legOf(c.m); if (!state.slip.some((x) => x.id === leg.id)) { state.slip.push(leg); n++; } }
-        saveSlip(); toast(`Added ${n} selection${n === 1 ? '' : 's'} to the bet slip. Enter Sky Bet's bet builder price when you log it.`); const y = window.scrollY; render(); window.scrollTo(0, y);
+        const pcv = state.priceChecks[b.dataset.key]; state.slipPrice = pcv ? parseOdds(pcv) : null;
+        saveSlip(); toast(`Added ${n} selection${n === 1 ? '' : 's'} to the bet slip.${state.slipPrice ? ' Your Sky Bet price is filled in for logging.' : " Enter Sky Bet's bet builder price when you log it."}`); const y = window.scrollY; render(); window.scrollTo(0, y);
         break;
       }
       case 'bets-period': state.betsUi.period = v; render(); break;
@@ -4967,7 +5387,7 @@ window.TEAMSHEET_VERSION='202611241948';
       case 'slip-open': state.slipOpen = true; render(); window.scrollTo(0, 0); break;
       case 'slip-close': state.slipOpen = false; render(); break;
       case 'slip-remove': state.slip.splice(+b.dataset.i, 1); saveSlip(); render(); break;
-      case 'slip-clear': state.slip = []; saveSlip(); render(); break;
+      case 'slip-clear': state.slip = []; state.slipPrice = null; saveSlip(); render(); break;
       case 'slip-copy': {
         const t = slipTotals();
         const txt = state.slip.map((l) => `${l.label} (${l.match}) ${pct(l.p)}${l.odds ? ' @ ' + l.odds : ''}`).join('\n') + `\nAll legs: ${pct(t.p)}, fair odds ${frac(t.fairDec)}${t.dec ? ', your odds ' + frac(t.dec) : ''}`;
@@ -5030,6 +5450,7 @@ window.TEAMSHEET_VERSION='202611241948';
     if (!bind) return;
     const s = state.settings;
     if (bind === 'accaN' || bind === 'freezeN') { state.acca[bind === 'accaN' ? 'n' : 'freezeN'] = +el.value; return; }
+    if (bind === 'pc') { state.priceChecks[el.dataset.key] = el.value.trim(); const y = window.scrollY; render(); window.scrollTo(0, y); return; }
     if (bind === 'bbTarget') { state.build.target = el.value.trim(); render(); return; }
     if (bind === 'bbMinP') { state.build.minP = +el.value; return; }
     if (bind === 'bbMaxLegs') { state.build.maxLegs = +el.value; return; }

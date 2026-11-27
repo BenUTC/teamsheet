@@ -264,7 +264,7 @@ nav.tabs a { font-size: 0.9rem; }
 <body>
 <div id="app"></div>
 <script>
-window.TEAMSHEET_VERSION='202611251312';
+window.TEAMSHEET_VERSION='202611271913';
 /* ===== stats.js ===== */
 /* Probability engine: count distributions, joint team-stat model, Dixon-Coles score matrix. */
 (function (root) {
@@ -3654,12 +3654,11 @@ window.TEAMSHEET_VERSION='202611251312';
         const a = addQ('T:' + c.spec.stat + ':a', { kind: 'T', stat: c.spec.stat, side: 'a', J, cond: h });
         tests.push((x) => c.spec.test(x[h], x[a]));
       } else {
-        const mm = c.m.family.match(/^p-([a-z]+)-/), st = PSTAT[mm[1]], lv = c.m.level || 1;
-        let pmf;
-        if (st === 'card') { const p = c.player.pred.card.p; pmf = [1 - p, p]; }
-        else pmf = c.player.pred[st === 'goals' ? 'goals' : st].pmf;
-        const k = addQ('P:' + st + ':' + c.player.id, { kind: 'P', stat: st, side: c.side, pid: c.player.id, cdf: cdfOf(pmf) });
-        tests.push((x) => x[k] >= lv);
+        // a player leg lands when his latent uniform clears 1 - p: the same as reading his count off its cdf,
+        // and it keeps any calibration applied to the leg's chance (c.p)
+        const st = PSTAT[c.m.family.match(/^p-([a-z]+)-/)[1]];
+        const k = addQ('P:' + st + ':' + c.player.id, { kind: 'P', stat: st, side: c.side, pid: c.player.id, cdf: Float64Array.from([1 - c.p, 1]) });
+        tests.push((x) => x[k] >= 1);
       }
     }
     const d = qs.length;
@@ -3737,6 +3736,11 @@ window.TEAMSHEET_VERSION='202611251312';
   }
   const GROUP_NAME = { goals: 'Result and goals', corners: 'Corners', cards: 'Cards', sot: 'Shots on target', shots: 'Shots' };
 
+  /* Backtest of 3,396 builders on 425 finished matches (backtest/bb_backtest.js, 40-50% minimum): the selections the
+     optimiser picks for these player markets landed less often than shown, in both halves of the period (it picks
+     the ones the model rates highest, which includes the ones it overrates). Scale them down in the builder. */
+  const CALIB = { sot: 0.88, goal: 0.7, fd: 0.96, shots: 0.97 };
+
   /* ---------- candidate legs from one analysed match ---------- */
   function matchCandidates(rep, opts) {
     const minP = opts.minLegP, maxP = opts.maxLegP || 0.95, minDec = opts.minLegOdds || 1.05;
@@ -3748,7 +3752,8 @@ window.TEAMSHEET_VERSION='202611251312';
     const out = [];
     for (const m of rep.markets) {
       // must-include types may fall back to 50% when nothing reaches the minimum; those are marked low
-      if (!(m.p >= Math.min(minP, 0.5) && m.p <= maxP)) continue;
+      const pm = m.isPlayer ? m.p * (CALIB[(m.family.match(/^p-([a-z]+)-/) || [])[1]] || 1) : m.p;
+      if (!(pm >= (opts.include && opts.include.size ? Math.min(minP, 0.5) : minP) && pm <= maxP)) continue;
       let key, spec = null, pl = null;
       if (m.isPlayer) {
         if (opts.includePlayers === false) continue;
@@ -3763,9 +3768,9 @@ window.TEAMSHEET_VERSION='202611251312';
         key = spec.stat;
       }
       const priced = !!m.price;
-      const dec = priced ? m.price : Math.max(1.01, +(1 / (m.p * (1 + BB_MARGIN))).toFixed(3));
+      const dec = priced ? m.price : Math.max(1.01, +(1 / (pm * (1 + BB_MARGIN))).toFixed(3));
       if (dec < minDec) continue;
-      out.push({ id: m.id, m, fixtureId: fx.id, key, gkey: fx.id + '|' + key, spec, player: pl, side: pl ? sideOf.get(String(m.playerId)) : null, p: m.p, dec, priced, book: priced ? m.priceBook : null, starter: pl ? (confirmed ? 'confirmed' : 'predicted') : null, low: m.p < minP });
+      out.push({ id: m.id, m, fixtureId: fx.id, key, gkey: fx.id + '|' + key, spec, player: pl, side: pl ? sideOf.get(String(m.playerId)) : null, p: pm, rawP: m.p, dec, priced, book: priced ? m.priceBook : null, starter: pl ? (confirmed ? 'confirmed' : 'predicted') : null, low: pm < minP });
     }
     return { ctx, cands: out };
   }
@@ -3890,13 +3895,34 @@ window.TEAMSHEET_VERSION='202611251312';
   }
 
   /* ---------- public: build one or two bet builders ---------- */
+  /* Selection types to pick from. The optimiser chooses freely among the ticked ones, any line and as many of a
+     type as give the best chance (2+ shots, 3+ saves, a team over 3.5 corners and so on). */
+  const TYPES = [
+    { id: 'result', name: 'Result or double chance', test: (c) => /^(res|dc)-/.test(c.m.family) },
+    { id: 'goals', name: 'Total goals', test: (c) => /^g-tot-/.test(c.m.family) },
+    { id: 'tgoals', name: 'Team goals', test: (c) => /^g-[HA]-/.test(c.m.family) },
+    { id: 'btts', name: 'Both teams to score', test: (c) => /^btts-/.test(c.m.family) },
+    { id: 'corners', name: 'Corners', test: (c) => c.key === 'corners' },
+    { id: 'cards', name: 'Cards', test: (c) => c.key === 'cards' },
+    { id: 'sot', name: 'Team shots on target', test: (c) => c.key === 'sot' },
+    { id: 'shots', name: 'Team shots', test: (c) => c.key === 'shots' },
+    { id: 'pshots', name: 'Player shots', test: (c) => /^p-shots-/.test(c.m.family) },
+    { id: 'psot', name: 'Player shots on target', test: (c) => /^p-sot-/.test(c.m.family) },
+    { id: 'pfc', name: 'Player fouls', test: (c) => /^p-fc-/.test(c.m.family) },
+    { id: 'pfd', name: 'Player fouled', test: (c) => /^p-fd-/.test(c.m.family) },
+    { id: 'psaves', name: 'Keeper saves', test: (c) => /^p-saves-/.test(c.m.family) },
+    { id: 'pgoal', name: 'Player to score', test: (c) => /^p-goal-/.test(c.m.family) },
+    { id: 'pcard', name: 'Player carded', test: (c) => /^p-card-/.test(c.m.family) },
+  ];
+  const typeOf = (c) => { for (const t of TYPES) if (t.test(c)) return t.id; return 'other'; };
   function prepare(reports, opts) {
     const ctxs = new Map(), cands = [], skipped = [];
     for (const rep of reports) {
       const f = rep.fixture;
       if (!opts.backtest && (f.status !== 'NS' || f.ts < (opts.now || Date.now()))) { skipped.push({ fixture: f, reason: 'has already kicked off' }); continue; }
       const r = matchCandidates(rep, opts);
-      if (!r.cands.some((c) => !c.low)) { skipped.push({ fixture: f, reason: 'has no selections at the chance you set' }); continue; }
+      if (opts.types) r.cands = r.cands.filter((c) => opts.types.has(typeOf(c)));
+      if (!r.cands.some((c) => !c.low)) { skipped.push({ fixture: f, reason: opts.types ? 'has no selections of the ticked types at the chance you set' : 'has no selections at the chance you set' }); continue; }
       ctxs.set(f.id, r.ctx);
       for (const c of r.cands) cands.push(c);
     }
@@ -3947,21 +3973,32 @@ window.TEAMSHEET_VERSION='202611251312';
     const ex = { ids: new Set(exclude ? exclude.ids : []), groups: new Set([...(exclude ? exclude.groups : []), ...C.used]) };
     const groups = [];
     for (const fid of prep.fixtureIds) for (const g of groupOptions(prep.cands.filter((c) => c.fixtureId === fid), prep.ctxs.get(fid), ex)) groups.push(g);
-    let picked = null, res = null, aim = target;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      picked = solve(groups, prep.fixtureIds, aim / cdec, Math.max(0, minLegs - C.legs.length), maxLegs - C.legs.length, C.covered);
-      if (!picked) break;
+    // The optimiser prices legs as unrelated; the simulation then knows better. Try a few aims above the target
+    // (linked legs shorten the price) and keep the most likely builder that really reaches the odds.
+    const pickAt = (aim) => {
+      const pk = solve(groups, prep.fixtureIds, aim / cdec, Math.max(0, minLegs - C.legs.length), maxLegs - C.legs.length, C.covered);
+      if (!pk) return null;
       const legs = C.legs.slice();
-      for (const o of picked) for (const c of o.legs) legs.push(c);
-      res = finish(legs, prep, opts);
-      if (res.meets) break;
-      aim *= (target / res.dec) * 1.01; // linked legs shortened the price: aim a little higher and pick again
+      for (const o of pk) for (const c of o.legs) legs.push(c);
+      return finish(legs, prep, opts);
+    };
+    let res = null, aim = target;
+    const tried = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const r = pickAt(aim);
+      if (!r) break;
+      tried.push(r);
+      if (r.meets) break;
+      const ratio = r.dec / evaluate(r.legs, prep.ctxs, false).dec;
+      aim = Math.max(aim * 1.005, (target / ratio) * (1.005 + 0.01 * attempt));
     }
-    if (picked && res && !res.meets) picked = null;
+    if (opts.sim !== false && FP.bbsim && tried.length) for (const k of [1.08, 1.18, 1.3, 1.45]) { const r = pickAt(target * k); if (r) tried.push(r); }
+    for (const r of tried) if (r.meets && (!res || r.p > res.p)) res = r;
+    const picked = !!res;
     if (!picked) {
       return { ok: false, missing: C.missing, reason: `With up to ${maxLegs} selections at ${Math.round(opts.minLegP * 100)}% or more each, these matches cannot reach those odds.${C.legs.length ? ` Your always-include types already use ${C.legs.length} of the ${maxLegs} selections.` : ''} Lower the odds, allow more selections, lower the chance per selection${C.legs.length ? ', untick some types' : ''} or add a match.` };
     }
-    if (opts.sim !== false && FP.bbsim) res = polish(res, prep, opts, minLegs);
+    if (opts.sim !== false && FP.bbsim) res = polish(res, prep, opts, minLegs, exclude);
     return Object.assign(res, { missing: C.missing, coreDec: cdec, coreN: C.legs.length });
   }
   function finish(legs, prep, opts) {
@@ -3972,7 +4009,7 @@ window.TEAMSHEET_VERSION='202611251312';
   /* The optimiser prices legs as if unrelated; the simulation then knows better. Polish the result with the
      simulation: drop a leg the odds do not need, or swap one (not a ticked-type leg) for another from the same
      match, whenever that raises the chance and still reaches the odds. */
-  function polish(b, prep, opts, minLegs) {
+  function polish(b, prep, opts, minLegs, exclude) {
     const T = opts.target * 0.999, quick = { N: 5000 };
     const covers = (legs) => prep.fixtureIds.every((f) => legs.some((c) => c.fixtureId === f));
     let cur = b;
@@ -3988,7 +4025,7 @@ window.TEAMSHEET_VERSION='202611251312';
       const ids = new Set(cur.legs.map((c) => c.id));
       cur.legs.forEach((out, i) => {
         if (out.must) return;
-        const alts = prep.cands.filter((c) => c.fixtureId === out.fixtureId && !ids.has(c.id) && !c.low)
+        const alts = prep.cands.filter((c) => c.fixtureId === out.fixtureId && !ids.has(c.id) && !c.low && !(exclude && (exclude.ids.has(c.id) || exclude.groups.has(c.gkey))))
           .map((c) => { const legs = cur.legs.slice(); legs[i] = c; return { legs, q: evaluate(legs, prep.ctxs, false) }; })
           .filter((x) => x.q.ok && x.q.dec >= T).sort((x, y) => y.q.p - x.q.p).slice(0, 4);
         for (const a of alts) tryLegs(a.legs);
@@ -4003,7 +4040,7 @@ window.TEAMSHEET_VERSION='202611251312';
   const order = (c) => (c.player ? 2 : c.key === 'goals' ? 0 : 1);
   function buildTwo(reports, opts) {
     const prep = prepare(reports, opts);
-    const a = build(prep, opts);
+    let a = build(prep, opts);
     let b = null;
     if (a.ok) {
       // second builder: different players and different lines; must-include types can reuse a team market with another line
@@ -4013,12 +4050,17 @@ window.TEAMSHEET_VERSION='202611251312';
       if (!b.ok) b = build(prep, opts, { ids, groups: new Set() }, { ids, groups: new Set() });
       if (b.ok && b.legs.map((c) => c.id).sort().join() === a.legs.map((c) => c.id).sort().join()) b = { ok: false, reason: 'No different combination reaches the odds.' };
     }
+    // Builder 1 is always the more likely of the two
+    if (a.ok && b && b.ok && b.p > a.p) { const t = a; a = b; b = t; }
     if (a.ok) a.kind = 'main';
     if (b && b.ok) b.kind = 'alt';
     // third builder: the highest chance at these odds, ignoring the ticked types (fewer selections, less margin)
     let c = null;
-    if (a.ok && opts.include && opts.include.size) {
-      c = build(prep, Object.assign({}, opts, { include: new Set() }));
+    if (a.ok && ((opts.include && opts.include.size) || (opts.types && TYPES.some((t) => !opts.types.has(t.id))))) {
+      const free = Object.assign({}, opts, { include: new Set(), types: null });
+      const prepAll = opts.types ? prepare(reports, free) : prep;
+      c = build(prepAll, free);
+      if (c.ok) c.prep = prepAll;
       if (c.ok) c.kind = 'best';
       const same = (x) => x && x.ok && x.legs.map((l) => l.id).sort().join() === c.legs.map((l) => l.id).sort().join();
       if (c.ok && (same(a) || same(b))) c = null;
@@ -4132,7 +4174,7 @@ window.TEAMSHEET_VERSION='202611251312';
     return [hist, exp ? exp + '.' : ''].filter(Boolean).join(' ');
   }
 
-  FP.builder = { typeCosts, linkScores, priceVerdict, CATS, core, teamSpec, matchCandidates, evaluate, prepare, build, buildTwo, swapOptions, applySwap, removeLeg, justify, solve, groupOptions, GROUP_NAME, BB_MARGIN, STEP };
+  FP.builder = { TYPES, typeOf, typeCosts, linkScores, priceVerdict, CATS, core, teamSpec, matchCandidates, evaluate, prepare, build, buildTwo, swapOptions, applySwap, removeLeg, justify, solve, groupOptions, GROUP_NAME, BB_MARGIN, STEP };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 
 /* ===== ui.js ===== */
@@ -4182,7 +4224,7 @@ window.TEAMSHEET_VERSION='202611251312';
     match: { league: null, mode: 'fixtures', list: null, teams: null, home: '', away: '', report: null, loading: null, error: null, tab: 'picks', side: 'home', open: new Set(), pickList: 'best', live: null, liveSide: 'home', liveErr: null },
     day: { date: londonISO(Date.now()), leagues: null, report: null, loading: null, error: null, tab: 'best', group: 'all' },
     priceChecks: {}, slipPrice: null,
-    build: { league: null, lists: new Map(), selected: new Map(), target: '5/1', minP: 0.65, maxLegs: 12, players: true, include: new Set(['goals', 'corners', 'cards', 'pshots', 'psot', 'pfc', 'pfd', 'psaves']), reports: new Map(), loading: null, error: null, result: null, active: 0, swap: null },
+    build: { league: null, lists: new Map(), selected: new Map(), target: '5/1', minP: 0.5, maxLegs: 12, players: true, types: new Set(FP.builder.TYPES.map((t) => t.id)), reports: new Map(), loading: null, error: null, result: null, active: 0, swap: null },
     acca: { mode: 'win', start: londonISO(Date.now()), days: 1, leagues: null, n: 4, target: '5/1', minLeg: '1/5', freezeN: 4, freezeMin: '6/4', minLead: 0.3, loading: null, error: null, result: null, data: null, dataKey: '' },
   };
 
@@ -5017,12 +5059,12 @@ window.TEAMSHEET_VERSION='202611251312';
     const setPanel = `<div class="panel"><h2>2. Target</h2>
       <label class="field" for="bbTarget">Odds at least</label><div class="chips" style="flex-wrap:wrap">${targets}</div>
       <input type="text" id="bbTarget" data-bind="bbTarget" value="${esc(B.target)}" placeholder="e.g. 5/1 or 6.0">
-      <div class="row" style="align-items:flex-start"><div class="grow"><label class="field" for="bbMinP">Each selection at least</label>${opt('bbMinP', [[0.55, '55% chance'], [0.6, '60% chance'], [0.65, '65% chance'], [0.7, '70% chance'], [0.75, '75% chance'], [0.8, '80% chance']], B.minP)}</div>
+      <div class="row" style="align-items:flex-start"><div class="grow"><label class="field" for="bbMinP">Each selection at least</label>${opt('bbMinP', [[0.4, '40% chance'], [0.45, '45% chance'], [0.5, '50% chance'], [0.55, '55% chance'], [0.6, '60% chance'], [0.65, '65% chance'], [0.7, '70% chance'], [0.75, '75% chance'], [0.8, '80% chance']], B.minP)}</div>
       <div class="grow"><label class="field" for="bbMaxLegs">Most selections</label>${opt('bbMaxLegs', [4, 5, 6, 8, 10, 12].map((n) => [n, n]), B.maxLegs)}</div></div>
       <div class="toggle"><input type="checkbox" id="bbPlayers" data-bind="bbPlayers" ${B.players ? 'checked' : ''}><label for="bbPlayers">Include player bets (starting players only)</label></div>
-      <label class="field">Always include one of each</label>
-      <div class="chips" style="flex-wrap:wrap" role="group" aria-label="Always include">${FP.builder.CATS.filter((k) => B.players || !/^p/.test(k.id)).map((k) => `<button class="chip" data-act="bb-inc" data-v="${k.id}" aria-pressed="${B.include.has(k.id)}">${esc(k.name)}</button>`).join('')}</div>
-      <p class="small muted" style="margin-top:4px">The most likely selection of each ticked type goes in first, then more are added to reach your odds. If no selection of a type reaches your minimum chance, the best one from 50% up is used and marked.</p>
+      <div class="row" style="align-items:flex-end;margin-top:6px"><label class="field grow" style="margin:0">Pick from</label><button class="chip" data-act="bb-types-all">${FP.builder.TYPES.every((t) => B.types.has(t.id)) ? 'Untick all' : 'Tick all'}</button></div>
+      <div class="chips" style="flex-wrap:wrap" role="group" aria-label="Pick from">${FP.builder.TYPES.filter((k) => B.players || !/^p/.test(k.id)).map((k) => `<button class="chip" data-act="bb-type" data-v="${k.id}" aria-pressed="${B.types.has(k.id)}">${esc(k.name)}</button>`).join('')}</div>
+      <p class="small muted" style="margin-top:4px">The builder chooses only from the ticked types, and only where they give the best chance. It considers every line, such as 2+ or 3+ shots, fouls and saves, a team over 3.5 corners or 1.5 cards, and can use several selections of one type.</p>
       <button class="btn wide" style="margin-top:6px" data-act="bb-build" ${sel.length && !B.loading ? '' : 'disabled'}>${sel.length ? `Build for ${sel.length} match${sel.length === 1 ? '' : 'es'}` : 'Choose a match first'}</button></div>`;
     let out = '';
     if (B.error) out += `<div class="error">${esc(B.error)}</div>`;
@@ -5038,7 +5080,7 @@ window.TEAMSHEET_VERSION='202611251312';
     if (state.view === 'build') { const y = window.scrollY; render(); window.scrollTo(0, y); }
   }
   const bbName = (b, i) => (b.kind === 'best' ? 'Best chance' : `Builder ${i + 1}`);
-  const BB_SUB = { main: 'Highest chance with your ticked types', alt: 'A different set of selections', best: 'Highest chance at your odds, ignoring the ticked types' };
+  const BB_SUB = { main: 'Highest chance from your ticked types', alt: 'A different set of selections', best: 'Highest chance at your odds from every type' };
   function viewBuildResult(R) {
     const B = state.build;
     let h = '';
@@ -5049,7 +5091,6 @@ window.TEAMSHEET_VERSION='202611251312';
     h += `<div class="bb-switch" role="tablist">${bs.map((b, i) => `<button role="tab" data-act="bb-tab" data-v="${i}" aria-selected="${B.active === i}"><span class="n">${esc(bbName(b, i))}</span><span class="s">${b.ok ? `${esc(frac(b.dec))}, ${pct(b.p)}` : 'none found'}</span></button>`).join('')}</div>`;
     const b = bs[B.active];
     h += b.ok ? ticket(b, B.active, R) : `<div class="empty">${esc(b.reason)}</div>`;
-    if (b.ok && b.kind === 'main' && R.opts.include && R.opts.include.size) h += costPanel(b, R);
     const lineups = R.prep.fixtureIds.map((fid) => R.prep.ctxs.get(fid));
     const pending = lineups.filter((c) => !c.confirmed);
     h += `<div class="panel small">${pending.length ? `<p style="margin-top:0"><b>Team news.</b> ${pending.length === lineups.length ? 'No team sheets are out yet' : 'Some team sheets are not out yet'}, so player selections only use players very likely to start (80% or more). Rebuild about an hour before kick-off to use the confirmed starting XI only.</p>` : '<p style="margin-top:0"><b>Team news.</b> Team sheets are confirmed for every match, so player selections only use the starting XI.</p>'}
@@ -5059,17 +5100,18 @@ window.TEAMSHEET_VERSION='202611251312';
   }
   function ticket(b, bi, R) {
     const B = state.build, target = R.opts.target;
-    if (!b._links) b._links = FP.builder.linkScores(b, R.prep);
+    if (!b._links) b._links = FP.builder.linkScores(b, b.prep || R.prep);
     const links = b._links;
     const byFx = new Map();
     b.legs.forEach((c, i) => { if (!byFx.has(c.fixtureId)) byFx.set(c.fixtureId, []); byFx.get(c.fixtureId).push([c, i]); });
     let body = '';
+    const P = b.prep || R.prep;
     for (const [fid, legs] of byFx) {
-      const ctx = R.prep.ctxs.get(fid), f = ctx.fixture;
+      const ctx = P.ctxs.get(fid), f = ctx.fixture;
       body += `<div class="tk-match"><div class="grow"><b>${esc(f.home.name)} v ${esc(f.away.name)}</b><div class="small muted">${esc(fmtShort(f.ts))} ${fmtTime(f.ts)}, ${esc(f.compName || '')}</div></div><span class="badge ${ctx.confirmed ? 'ok' : 'warn'}">${ctx.confirmed ? 'Starting XI out' : 'Predicted XI'}</span></div>`;
       for (const [c, i] of legs) {
         const open = B.swap && B.swap.b === bi && B.swap.i === i;
-        body += `<div class="tk-leg k-${c.player ? 'player' : c.key}${open ? ' open' : ''}"><div class="grow"><div class="tk-cat">${esc(BB_CAT(c))}${links[i] > 1.08 ? ' <span class="tk-link" title="Tends to land when the others do">Linked</span>' : ''}</div><div class="tk-lbl">${esc(c.m.label)}</div><div class="tk-why">${esc(FP.builder.justify(c, R.prep))}${c.low ? ` <b>Best available ${esc(c.must.toLowerCase())} selection, below your ${pct(R.opts.minLegP)} minimum.</b>` : ''}</div></div>
+        body += `<div class="tk-leg k-${c.player ? 'player' : c.key}${open ? ' open' : ''}"><div class="grow"><div class="tk-cat">${esc(BB_CAT(c))}${links[i] > 1.08 ? ' <span class="tk-link" title="Tends to land when the others do">Linked</span>' : ''}</div><div class="tk-lbl">${esc(c.m.label)}</div><div class="tk-why">${esc(FP.builder.justify(c, P))}</div></div>
           <div class="tk-side"><div class="tk-p">${pct(c.p)}</div><div class="tk-price">${esc(frac(c.dec))}${c.priced ? '' : ' <i>est.</i>'}</div><button class="tk-swap" data-act="bb-swap" data-b="${bi}" data-i="${i}" aria-expanded="${open}">${open ? 'Close' : 'Swap'}</button></div></div>`;
         if (open) body += swapPanel(b, bi, i, R);
       }
@@ -5078,8 +5120,6 @@ window.TEAMSHEET_VERSION='202611251312';
     return `<article class="ticket">
       <header class="tk-head"><div><div class="tk-name">${esc(bbName(b, bi))}</div><div class="tk-sub">${esc(BB_SUB[b.kind] || '')}${b.edited ? ', edited' : ''}</div></div>
         <div class="tk-odds"><div class="big">${esc(frac(b.dec))}</div><div class="small">${b.dec.toFixed(2)}, ${pct(b.p)} chance</div></div></header>
-      ${b.missing && b.missing.length ? `<div class="note" style="margin:0;border-radius:0">No ${esc(b.missing.join(', ').toLowerCase())} selection reached 50% in ${R.prep.fixtureIds.length > 1 ? 'these matches' : 'this match'}${bi > 0 ? ' with different players' : ''}, so ${b.missing.length > 1 ? 'they are' : 'it is'} not in this builder.</div>` : ''}
-      ${b.coreDec && b.coreDec > R.opts.target * 1.05 ? `<div class="note" style="margin:0;border-radius:0">Your ticked types alone come to ${esc(frac(b.coreDec))}, above your ${esc(frac(R.opts.target))} target. Untick some for a shorter price.</div>` : ''}
       <div class="tk-body">${body}</div>
       <div class="tk-perf" aria-hidden="true"></div>
       <footer class="tk-foot">
@@ -5091,20 +5131,6 @@ window.TEAMSHEET_VERSION='202611251312';
         ${priceCheck('bb:' + b.legs.map((c) => c.id).join(','), b.p, links.some((x) => x > 1.08))}
         <div class="row" style="margin-top:12px"><button class="btn grow" data-act="bb-add" data-b="${bi}" data-key="${esc('bb:' + b.legs.map((c) => c.id).join(','))}">Add to bet slip</button></div>
       </footer></article>`;
-  }
-  function costPanel(b, R) {
-    const B = state.build;
-    if (!B.costs || B.costs.key !== b.legs.map((c) => c.id).join(',')) {
-      return `<div class="panel"><h3>What your ticked types cost</h3><p class="small muted">Each ticked type adds a selection, and every selection carries bookmaker margin. See how much more likely this builder is without each one.</p>
-        <button class="btn secondary wide" data-act="bb-costs" ${B.costsBusy ? 'disabled' : ''}>${B.costsBusy ? 'Working it out' : 'Show what each type costs'}</button></div>`;
-    }
-    const rows = B.costs.list.map((c, k) => {
-      const better = c.p != null && c.p - b.p >= 0.003, p1 = (x) => (x * 100).toFixed(1) + '%';
-      return `<div class="row bb-cost"><div class="grow"><b>${esc(c.name)}</b><div class="small muted">${esc(c.leg.m.label)}</div></div>
-        <div class="tk-res">${better ? `<b>${p1(b.p)} to ${p1(c.p)}</b><span class="small">at ${esc(frac(c.dec))}</span>` : '<span class="small muted">No better without it</span>'}</div>
-        ${better ? `<button class="tk-swap" data-act="bb-drop" data-k="${k}">Drop it</button>` : ''}</div>`;
-    }).join('');
-    return `<div class="panel"><h3>What your ticked types cost</h3><p class="small muted">Chance of this builder now, and without each type's selection (other selections are added back to reach your odds). Drop it replaces Builder 1 and unticks the type.</p>${rows}</div>`;
   }
   function priceCheck(key, p, linked, note) {
     const v = state.priceChecks[key] || '';
@@ -5124,7 +5150,7 @@ window.TEAMSHEET_VERSION='202611251312';
   }
   function swapPanel(b, bi, i, R) {
     const ck = bi + '|' + i + '|' + b.legs.map((c) => c.id).join(',');
-    if (!state.build.swapCache || state.build.swapCache.k !== ck) state.build.swapCache = { k: ck, alts: FP.builder.swapOptions(b, i, R.prep, R.opts, 6) };
+    if (!state.build.swapCache || state.build.swapCache.k !== ck) state.build.swapCache = { k: ck, alts: FP.builder.swapOptions(b, i, b.prep || R.prep, R.opts, 6) };
     const alts = state.build.swapCache.alts;
     bbAlts.length = 0;
     const rows = alts.map((a, k) => { bbAlts.push(a.c); return `<button class="tk-alt${a.meets ? '' : ' short'}" data-act="bb-swap-pick" data-b="${bi}" data-i="${i}" data-k="${k}">
@@ -5152,8 +5178,9 @@ window.TEAMSHEET_VERSION='202611251312';
       }
       B.loading = 'Picking selections'; setProgress(B.loading);
       await new Promise((r) => setTimeout(r, 0));
-      const include = new Set([...B.include].filter((k) => B.players || !/^p/.test(k)));
-      const opts = { target, minLegP: B.minP, maxLegs: B.maxLegs, includePlayers: B.players, include, now: Date.now() };
+      const types = new Set([...B.types].filter((k) => B.players || !/^p/.test(k)));
+      if (!types.size) throw new Error('Tick at least one type to pick from.');
+      const opts = { target, minLegP: B.minP, maxLegs: B.maxLegs, includePlayers: B.players, types, now: Date.now() };
       B.result = Object.assign(FP.builder.buildTwo(reps, opts), { opts });
       B.active = 0; B.showList = false;
     } catch (err) { B.error = err.kind ? friendlyError(err) : err.message; }
@@ -5290,26 +5317,6 @@ window.TEAMSHEET_VERSION='202611251312';
         break;
       }
       case 'bb-league': state.build.league = +id; render(); break;
-      case 'bb-costs': {
-        const B = state.build, R = B.result, main = R && R.builders.find((x) => x.kind === 'main');
-        if (!main || B.costsBusy) break;
-        B.costsBusy = true; const y = window.scrollY; render(); window.scrollTo(0, y);
-        setTimeout(() => {
-          try { B.costs = { key: main.legs.map((c) => c.id).join(','), list: FP.builder.typeCosts(R.prep, R.opts, main) }; }
-          catch (err) { toast('Could not work that out'); }
-          B.costsBusy = false; const y2 = window.scrollY; render(); window.scrollTo(0, y2);
-        }, 30);
-        break;
-      }
-      case 'bb-drop': {
-        const B = state.build, R = B.result, c = B.costs && B.costs.list[+b.dataset.k];
-        if (!R || !c || !c.builder) break;
-        const i = R.builders.findIndex((x) => x.kind === 'main');
-        R.builders[i] = Object.assign(c.builder, { edited: true });
-        R.opts = Object.assign({}, R.opts, { include: new Set([...R.opts.include].filter((k) => k !== c.id)) });
-        B.include.delete(c.id); B.costs = null; B.active = i; B.swap = null;
-        toast(`Dropped ${c.name.toLowerCase()}`); const y = window.scrollY; render(); window.scrollTo(0, y); break;
-      }
       case 'bb-showlist': state.build.showList = true; render(); break;
       case 'bb-toggle': {
         const B = state.build, L = B.lists.get(B.league), f = L && L.list.find((x) => String(x.id) === String(id));
@@ -5321,7 +5328,8 @@ window.TEAMSHEET_VERSION='202611251312';
       }
       case 'bb-unpick': { const B = state.build; for (const k of B.selected.keys()) if (String(k) === String(id)) B.selected.delete(k); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
       case 'bb-target': state.build.target = v; render(); break;
-      case 'bb-inc': { const I = state.build.include; if (I.has(v)) I.delete(v); else I.add(v); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
+      case 'bb-type': { const I = state.build.types; if (I.has(v)) I.delete(v); else I.add(v); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
+      case 'bb-types-all': { const B = state.build, all = FP.builder.TYPES.every((t) => B.types.has(t.id)); B.types = new Set(all ? [] : FP.builder.TYPES.map((t) => t.id)); const y = window.scrollY; render(); window.scrollTo(0, y); break; }
       case 'bb-build': runBuild(false); break;
       case 'bb-rebuild': runBuild(true); break;
       case 'bb-tab': state.build.active = +v; state.build.swap = null; render(); break;
@@ -5333,14 +5341,15 @@ window.TEAMSHEET_VERSION='202611251312';
       case 'bb-swap-pick': {
         const B = state.build, R = B.result, bi = +b.dataset.b, i = +b.dataset.i, c = bbAlts[+b.dataset.k];
         if (!R || !c) break;
-        R.builders[bi] = Object.assign(FP.builder.applySwap(R.builders[bi], i, c, R.prep, R.opts), { edited: true });
+        const ob = R.builders[bi];
+        R.builders[bi] = Object.assign(FP.builder.applySwap(ob, i, c, ob.prep || R.prep, R.opts), { edited: true, kind: ob.kind, prep: ob.prep });
         B.swap = null; toast('Swapped'); const y = window.scrollY; render(); window.scrollTo(0, y); break;
       }
       case 'bb-remove': {
         const B = state.build, R = B.result, bi = +b.dataset.b, i = +b.dataset.i;
-        const nb = R && FP.builder.removeLeg(R.builders[bi], i, R.prep, R.opts);
+        const ob = R && R.builders[bi], nb = ob && FP.builder.removeLeg(ob, i, ob.prep || R.prep, R.opts);
         if (!nb) break;
-        R.builders[bi] = Object.assign(nb, { edited: true }); B.swap = null; toast('Removed'); const y = window.scrollY; render(); window.scrollTo(0, y); break;
+        R.builders[bi] = Object.assign(nb, { edited: true, kind: ob.kind, prep: ob.prep }); B.swap = null; toast('Removed'); const y = window.scrollY; render(); window.scrollTo(0, y); break;
       }
       case 'bb-add': {
         const R = state.build.result, bb = R && R.builders[+b.dataset.b]; if (!bb || !bb.ok) break;
